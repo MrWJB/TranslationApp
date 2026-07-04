@@ -191,6 +191,35 @@ The crawler auto-detects navigation (sidebar, TOC, Antora/Spring patterns) and p
 - Schema: `backend/src/main/resources/db/schema.sql`
 - Seed: `backend/src/main/resources/db/seed.sql`
 
+## 6. Incremental Database Export
+
+Export all tables into date-named folders (one folder per day):
+
+```powershell
+.\scripts\export-db.ps1
+```
+
+Output layout:
+
+```
+data-exports/incremental/2026-07-04/
+  metadata.json      # export time, table list, row counts
+  users.sql
+  crawl_tasks.sql
+  documents.sql
+  ...
+```
+
+Re-running on the same day overwrites that day's folder. To keep multiple exports per day:
+
+```powershell
+.\scripts\export-db.ps1 -SameDayMode timestamp
+```
+
+See `scripts/README.md` for all options (`-IncludeSchema`, custom `-MySqlBin`, etc.).
+
+Exports are gitignored under `data-exports/`.
+
 ## H2 Fallback (no MySQL)
 
 ```powershell

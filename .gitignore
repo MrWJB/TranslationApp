@@ -28,3 +28,6 @@ frontend/node_modules/.vite/
 backend/spring-doc-images/
 backend/data/*.html
 backend/data/translationdb.*
+
+# Database incremental exports
+data-exports/
