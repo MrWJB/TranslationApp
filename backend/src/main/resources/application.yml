@@ -1,0 +1,138 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: translation-app
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:translation_app}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:1234qwer}
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:default}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+
+app:
+  seed-users:
+    enabled: ${SEED_DEFAULT_USERS:true}
+    admin-password: ${DEFAULT_ADMIN_PASSWORD:admin123}
+    user-password: ${DEFAULT_USER_PASSWORD:user123}
+  import-local-on-startup: ${IMPORT_LOCAL_ON_STARTUP:false}
+  sms:
+    mock-enabled: ${SMS_MOCK_ENABLED:true}
+    mock-code: ${SMS_MOCK_CODE:123456}
+    code-ttl-minutes: ${SMS_CODE_TTL_MINUTES:5}
+  captcha:
+    ttl-seconds: ${CAPTCHA_TTL_SECONDS:300}
+    width: 130
+    height: 44
+  oauth:
+    frontend-callback-url: ${OAUTH_FRONTEND_CALLBACK:http://localhost:5173/oauth/callback}
+    demo-mode: ${OAUTH_DEMO_MODE:false}
+    github:
+      enabled: ${GITHUB_OAUTH_ENABLED:false}
+      client-id: ${GITHUB_CLIENT_ID:}
+      client-secret: ${GITHUB_CLIENT_SECRET:}
+      redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:8080/api/auth/oauth/github/callback}
+    wechat:
+      enabled: ${WECHAT_OAUTH_ENABLED:false}
+      client-id: ${WECHAT_APP_ID:}
+      client-secret: ${WECHAT_APP_SECRET:}
+      redirect-uri: ${WECHAT_REDIRECT_URI:http://localhost:8080/api/auth/oauth/wechat/callback}
+    qq:
+      enabled: ${QQ_OAUTH_ENABLED:false}
+      client-id: ${QQ_APP_ID:}
+      client-secret: ${QQ_APP_KEY:}
+      redirect-uri: ${QQ_REDIRECT_URI:http://localhost:8080/api/auth/oauth/qq/callback}
+    wecom:
+      enabled: ${WECOM_OAUTH_ENABLED:false}
+      client-id: ${WECOM_CORP_ID:}
+      client-secret: ${WECOM_CORP_SECRET:}
+      agent-id: ${WECOM_AGENT_ID:}
+      redirect-uri: ${WECOM_REDIRECT_URI:http://localhost:8080/api/auth/oauth/wecom/callback}
+
+translation:
+  on-crawl: ${TRANSLATION_ON_CRAWL:true}
+  delay-ms: ${TRANSLATION_DELAY_MS:50}
+  deepl:
+    api-key: ${DEEPL_API_KEY:your-api-key-here}
+    api-url: ${DEEPL_API_URL:https://api-free.deepl.com/v2/translate}
+
+crawler:
+  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+  timeout: 30000
+  max-depth: 3
+  max-pages: 100
+  concurrency: ${CRAWL_CONCURRENCY:6}
+  node-service:
+    url: ${CRAWLER_NODE_SERVICE_URL:http://localhost:3000}
+  video-directory: ${CRAWLER_VIDEO_DIRECTORY:../crawler-service/crawled-videos}
+  docs-dirs: ${CRAWLER_DOCS_DIRS:}
+  nav-cache-hours: ${CRAWLER_NAV_CACHE_HOURS:24}
+  nav-fetch-timeout-ms: ${CRAWLER_NAV_FETCH_TIMEOUT_MS:30000}
+
+jwt:
+  secret: ${JWT_SECRET:mySecretKeyForTranslationApp2024VeryLongSecret}
+  expiration: ${JWT_EXPIRATION_MS:86400000}
+  remember-me-expiration: ${JWT_REMEMBER_ME_EXPIRATION_MS:604800000}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+  bucket: ${MINIO_BUCKET:im-attachments}
+  enabled: ${MINIO_ENABLED:true}
+
+im:
+  message:
+    max-length: 10000
+    history-page-size: 30
+  attachment:
+    max-size-bytes: 52428800
+    allowed-mime-types: image/*,application/pdf,application/zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain
+  presence:
+    heartbeat-interval-ms: 30000
+    ttl-seconds: 90
+  redis-relay:
+    enabled: ${IM_REDIS_RELAY_ENABLED:true}
+    channel: im:user-events
+
+webrtc:
+  stun-urls: ${WEBRTC_STUN_URLS:stun:localhost:3478}
+  turn-urls: ${WEBRTC_TURN_URLS:turn:localhost:3478}
+  turn-username: ${COTURN_USERNAME:imturn}
+  turn-credential: ${COTURN_PASSWORD:imturnsecret}
+
+logging:
+  level:
+    root: INFO
+    com.translationapp: INFO
+    com.translationapp.crawler: DEBUG
+    com.translationapp.service: DEBUG
+    org.springframework.web: WARN
+    org.hibernate: WARN
+    org.apache.catalina: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36}) - %msg%n"

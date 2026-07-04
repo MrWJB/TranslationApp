@@ -1,0 +1,30 @@
+node_modules/
+target/
+dist/
+*.log
+.env
+.env.*
+
+# Crawl runtime data
+crawler-service/crawled-docs/
+crawler-service/crawled-videos/
+crawler-service/logs/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend generated
+frontend/auto-imports.d.ts
+frontend/components.d.ts
+frontend/node_modules/.vite/
+
+# Legacy artifacts
+backend/spring-doc-images/
+backend/data/*.html
+backend/data/translationdb.*
