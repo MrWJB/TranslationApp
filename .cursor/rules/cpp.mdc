@@ -1,0 +1,52 @@
+---
+description: 现代 C/C++ 工程化开发规范
+globs: ["**/*.cpp", "**/*.h", "**/*.hpp", "**/*.cc"]
+alwaysApply: false
+---
+
+# C/C++ 编码规范
+
+## 语言标准与编译
+- C++ 项目统一使用 C++17 或 C++20 标准，禁止使用已废弃特性（如 `register`、`auto_ptr`）
+- C 项目遵循 C11 标准，禁止使用 GCC/Clang 扩展语法
+- 编译必须开启 `-Wall -Wextra -Werror`，将警告视为错误
+- 使用 CMake 作为构建系统，禁止手写 Makefile（除非嵌入式特殊场景）
+
+## 内存管理
+- C++ 优先使用智能指针（`std::unique_ptr`、`std::shared_ptr`），禁止裸 `new/delete`
+- 资源获取即初始化（RAII）原则：所有资源（文件句柄、锁、网络连接）必须在构造函数中获取，析构函数中释放
+- C 代码中使用 `goto cleanup` 模式统一释放资源，禁止多处 return 导致泄漏
+- 禁止使用 `malloc/free`（C++ 中），禁止使用 `new[]/delete[]` 混用
+
+## 命名与风格
+- 类名/结构体：PascalCase（如 `UserProfile`）
+- 函数/变量：camelCase 或 snake_case（团队统一，不可混用）
+- 宏/常量：全大写下划线分隔（如 `MAX_BUFFER_SIZE`）
+- 成员变量：`m_` 前缀（如 `m_name`）或 `_` 后缀（如 `name_`），团队统一
+- 头文件使用 `#pragma once` 替代传统 include guard
+
+## 类型安全
+- 使用 `nullptr` 替代 `NULL` 或 `0`
+- 使用 `enum class` 替代传统 `enum`，避免隐式类型转换
+- 使用 `static_cast` / `reinterpret_cast` 等显式转换，禁止 C 风格强制转换 `(int)x`
+- 使用 `auto` 减少类型冗余，但函数返回值和公共接口必须显式声明类型
+- 整数类型使用 `<cstdint>` 中的固定宽度类型（`int32_t`、`uint64_t`）
+
+## 并发与线程安全
+- 使用 `std::mutex` + `std::lock_guard` / `std::unique_lock` 保护共享数据
+- 禁止使用 `std::recursive_mutex`，出现递归锁说明设计有问题
+- 优先使用 `std::atomic` 处理简单计数器场景
+- 线程池使用固定大小，禁止无限制创建线程
+
+## 安全规范
+- 禁止使用 `strcpy`、`strcat`、`sprintf` 等不安全函数，使用 `strncpy`、`snprintf` 等安全版本
+- 数组访问必须检查边界，禁止指针越界操作
+- 所有外部输入必须校验长度和格式
+- 禁止使用 `gets()`，使用 `fgets()` 替代
+- 格式化字符串禁止使用用户输入作为 format 参数
+
+## 注释与文档
+- 公共 API 必须使用 Doxygen 风格注释（`@brief`、`@param`、`@return`）
+- 复杂算法必须注释算法名称和复杂度
+- 头文件中只放声明，实现放在 `.cpp` 文件中
+- 禁止在头文件中包含实现代码（模板类除外）

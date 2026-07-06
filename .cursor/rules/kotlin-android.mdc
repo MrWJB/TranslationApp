@@ -1,0 +1,47 @@
+---
+description: Kotlin 与 Android Jetpack Compose 开发规范
+globs: ["**/*.kt"]
+alwaysApply: false
+---
+
+# Kotlin / Android 编码规范
+
+## 语言特性
+- 优先使用 `val`（不可变）而非 `var`（可变），仅在确实需要修改时使用 `var`
+- 使用 `data class` 定义数据载体，使用 `sealed class` / `sealed interface` 定义有限状态
+- 使用 `object` 定义单例和工具类，禁止使用 Java 风格的私有构造函数
+- 使用 Kotlin 标准库函数（`let`、`apply`、`also`、`run`、`with`）简化链式调用
+
+## 空安全
+- 尽量避免使用 `!!`（非空断言），使用 `?.`（安全调用）和 `?:`（Elvis 运算符）
+- 需要解包可空值时使用 `?.let { }` 模式
+- 函数参数尽量声明为非空类型，在函数入口处理空值转换
+
+## Android 架构
+- 遵循 MVVM 架构：UI 层（Activity/Fragment/Composable）→ ViewModel → Repository → DataSource
+- ViewModel 禁止持有 Activity/Fragment 引用，使用 `viewModelScope` 管理协程生命周期
+- Repository 统一数据源（网络 + 本地缓存），对上层屏蔽数据来源
+- 使用 Hilt 进行依赖注入，禁止手动 new 依赖对象
+
+## Jetpack Compose
+- Composable 函数使用 PascalCase 命名（如 `UserProfileCard()`）
+- 状态提升（State Hoisting）：将状态提升到调用方管理，Composable 保持无状态
+- 使用 `remember` + `mutableStateOf` 管理组件内状态
+- 副作用使用 `LaunchedEffect`（一次性）或 `DisposableEffect`（需清理），禁止在 Composable 中直接启动协程
+- 避免在 Composable 中创建对象（如 `ViewModel`），通过参数传入
+
+## 协程
+- IO 操作使用 `Dispatchers.IO`，CPU 密集操作使用 `Dispatchers.Default`
+- 使用 `viewModelScope` / `lifecycleScope` 自动取消协程，禁止使用 `GlobalScope`
+- 多个并发请求使用 `async/await`，顺序请求使用直接 `suspend` 调用
+- 异常处理使用 `CoroutineExceptionHandler` 或 try-catch
+
+## 资源与命名
+- 布局文件：snake_case（如 `activity_main.xml`）
+- 字符串资源：snake_case（如 `error_network_timeout`）
+- 颜色/尺寸：语义化命名（如 `color_primary`、`spacing_medium`），禁止硬编码
+
+## 安全
+- 敏感数据使用 `EncryptedSharedPreferences` 或 Android Keystore 存储
+- 网络通信强制使用 HTTPS，配置 Network Security Config
+- 禁止在日志中打印敏感信息（Token、密码），Release 构建禁用 `Log.d()`

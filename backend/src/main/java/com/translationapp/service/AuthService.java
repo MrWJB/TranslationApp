@@ -1,5 +1,6 @@
 package com.translationapp.service;
 
+import com.translationapp.analytics.service.AnalyticsService;
 import com.translationapp.dto.LoginRequest;
 import com.translationapp.dto.LoginResponse;
 import com.translationapp.dto.PhoneRegisterRequest;
@@ -28,6 +29,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final SmsCodeService smsCodeService;
     private final CaptchaService captchaService;
+    private final AnalyticsService analyticsService;
 
     public LoginResponse login(LoginRequest request) {
         captchaService.validate(request.getCaptchaId(), request.getCaptchaCode());
@@ -39,6 +41,7 @@ public class AuthService {
             throw new IllegalArgumentException("用户名或密码错误");
         }
 
+        analyticsService.recordLogin(user.getId(), null);
         return buildLoginResponse(user, request.isRememberMe());
     }
 

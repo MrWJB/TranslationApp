@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
   {
+    path: '/bigscreen',
+    name: 'BigScreen',
+    component: () => import('@/views/BigScreen.vue'),
+    meta: { requiresAuth: true, fullscreen: true },
+  },
+  {
     path: '/',
     component: () => import('@/components/MainLayout.vue'),
     meta: { requiresAuth: true },
@@ -65,6 +71,11 @@ const routes: RouteRecordRaw[] = [
         path: 'messages/:conversationId',
         name: 'MessagesConversation',
         component: () => import('@/views/im/ChatLayout.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'UserSettings',
+        component: () => import('@/views/profile/UserSettings.vue'),
       },
       {
         path: 'system/departments',

@@ -1,11 +1,21 @@
+# =============================================================================
+# TranslationApp 后端配置
+# 环境变量可覆盖默认值，格式：${ENV_VAR:默认值}
+# =============================================================================
+
+# HTTP 服务
 server:
+  # 后端 API 监听端口
   port: 8080
 
 spring:
   application:
+    # Spring 应用名称（日志、监控标识）
     name: translation-app
 
+  # MySQL 数据源
   datasource:
+    # JDBC 连接串；MYSQL_HOST 建议本地开发用 127.0.0.1 避免 SOCKS 代理干扰
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:translation_app}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${MYSQL_USER:root}
@@ -13,11 +23,14 @@ spring:
 
   h2:
     console:
+      # 是否启用 H2 控制台（生产环境保持 false）
       enabled: false
 
   jpa:
     hibernate:
+      # 表结构策略：validate=仅校验不自动改表；开发可改为 update
       ddl-auto: ${JPA_DDL_AUTO:validate}
+    # 是否在控制台打印 SQL
     show-sql: false
     properties:
       hibernate:
@@ -25,31 +38,44 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
 
   profiles:
+    # 激活的 Spring Profile（default / dev / prod 等）
     active: ${SPRING_PROFILES_ACTIVE:default}
 
   data:
     redis:
+      # Redis 主机（验证码、IM 在线状态、会话等）
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 2000ms
 
+# 应用业务配置
 app:
   seed-users:
+    # 启动时是否创建默认 admin / user 账号
     enabled: ${SEED_DEFAULT_USERS:true}
     admin-password: ${DEFAULT_ADMIN_PASSWORD:admin123}
     user-password: ${DEFAULT_USER_PASSWORD:user123}
+  # 启动时是否从本地 crawled-docs 导入已有 HTML
   import-local-on-startup: ${IMPORT_LOCAL_ON_STARTUP:false}
+
   sms:
+    # true=不发送真实短信，使用 mock-code 验证码（开发环境）
     mock-enabled: ${SMS_MOCK_ENABLED:true}
     mock-code: ${SMS_MOCK_CODE:123456}
+    # 短信验证码有效期（分钟）
     code-ttl-minutes: ${SMS_CODE_TTL_MINUTES:5}
+
   captcha:
+    # 图形验证码 TTL（秒）
     ttl-seconds: ${CAPTCHA_TTL_SECONDS:300}
     width: 130
     height: 44
+
   oauth:
+    # OAuth 登录成功后前端回调地址
     frontend-callback-url: ${OAUTH_FRONTEND_CALLBACK:http://localhost:5173/oauth/callback}
+    # true=演示模式，不调用真实 OAuth 提供商
     demo-mode: ${OAUTH_DEMO_MODE:false}
     github:
       enabled: ${GITHUB_OAUTH_ENABLED:false}
@@ -73,58 +99,119 @@ app:
       agent-id: ${WECOM_AGENT_ID:}
       redirect-uri: ${WECOM_REDIRECT_URI:http://localhost:8080/api/auth/oauth/wecom/callback}
 
-translation:
-  on-crawl: ${TRANSLATION_ON_CRAWL:true}
-  delay-ms: ${TRANSLATION_DELAY_MS:50}
-  deepl:
-    api-key: ${DEEPL_API_KEY:your-api-key-here}
-    api-url: ${DEEPL_API_URL:https://api-free.deepl.com/v2/translate}
+  analytics:
+    # 大屏统计无数据时是否注入演示数据
+    seed-demo-data: ${ANALYTICS_SEED_DEMO_DATA:true}
 
+  avatar:
+    # 用户头像上传目录（相对或绝对路径）
+    upload-dir: ${AVATAR_UPLOAD_DIR:uploads/avatars}
+
+# 文档翻译（多引擎）
+translation:
+  # 爬取完成后是否自动翻译
+  on-crawl: ${TRANSLATION_ON_CRAWL:true}
+  # 批量翻译时每页间隔（毫秒），降低 API 限流风险
+  delay-ms: ${TRANSLATION_DELAY_MS:50}
+  # 主翻译引擎：deepl | azure | tencent | ollama
+  provider: ${TRANSLATION_PROVIDER:deepl}
+  # 主引擎配额/限流失败时的备选引擎（逗号分隔，如 azure,ollama）
+  fallback-providers: ${TRANSLATION_FALLBACK_PROVIDERS:}
+  deepl:
+    # DeepL API Key；Free 密钥以 :fx 结尾
+    api-key: ${DEEPL_API_KEY:20f0ff60-1917-433f-a327-5a060451660b:fx}
+    # Free → api-free.deepl.com；Pro → api.deepl.com（与密钥类型不匹配时启动自动纠正）
+    api-url: ${DEEPL_API_URL:https://api-free.deepl.com/v2/translate}
+  azure:
+    # Azure Cognitive Translator 订阅密钥
+    subscription-key: ${AZURE_TRANSLATOR_KEY:}
+    # 资源区域（global 或 eastasia 等）
+    region: ${AZURE_TRANSLATOR_REGION:global}
+    endpoint: ${AZURE_TRANSLATOR_ENDPOINT:https://api.cognitive.microsofttranslator.com}
+  tencent:
+    # 腾讯云 API 密钥（TMT 机器翻译）
+    secret-id: ${TENCENT_SECRET_ID:}
+    secret-key: ${TENCENT_SECRET_KEY:}
+    region: ${TENCENT_SECRET_REGION:ap-guangzhou}
+    endpoint: ${TENCENT_TMT_ENDPOINT:https://tmt.tencentcloudapi.com}
+    project-id: ${TENCENT_TMT_PROJECT_ID:0}
+  ollama:
+    # 本地 Ollama 服务地址
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    # 用于翻译的模型名
+    model: ${OLLAMA_MODEL:qwen2.5:7b}
+
+# 爬虫与文档存储
 crawler:
+  # HTTP 请求 User-Agent
   user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+  # 单页抓取超时（毫秒）
   timeout: 30000
+  # 最大爬取深度
   max-depth: 3
+  # 单次任务最大页面数
   max-pages: 100
+  # 并发爬取线程数
   concurrency: ${CRAWL_CONCURRENCY:6}
   node-service:
+    # Node.js crawler-service 地址
     url: ${CRAWLER_NODE_SERVICE_URL:http://localhost:3000}
+  # 爬取视频保存目录
   video-directory: ${CRAWLER_VIDEO_DIRECTORY:../crawler-service/crawled-videos}
+  # 额外文档根目录（逗号分隔，留空则用默认 crawled-docs）
   docs-dirs: ${CRAWLER_DOCS_DIRS:}
+  # 导航/TOC 缓存有效期（小时）
   nav-cache-hours: ${CRAWLER_NAV_CACHE_HOURS:24}
+  # 拉取导航超时（毫秒）
   nav-fetch-timeout-ms: ${CRAWLER_NAV_FETCH_TIMEOUT_MS:30000}
 
+# JWT 登录令牌
 jwt:
+  # 签名密钥（生产环境务必更换为长随机串）
   secret: ${JWT_SECRET:mySecretKeyForTranslationApp2024VeryLongSecret}
+  # 普通登录 token 有效期（毫秒，默认 24h）
   expiration: ${JWT_EXPIRATION_MS:86400000}
+  # 「记住我」token 有效期（毫秒，默认 7 天）
   remember-me-expiration: ${JWT_REMEMBER_ME_EXPIRATION_MS:604800000}
 
+# MinIO 对象存储（IM 附件等）
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin123}
   bucket: ${MINIO_BUCKET:im-attachments}
+  # false=禁用 MinIO，附件走本地或其他存储
   enabled: ${MINIO_ENABLED:true}
 
+# 即时通讯（IM）
 im:
   message:
+    # 单条消息最大字符数
     max-length: 10000
+    # 历史消息分页大小
     history-page-size: 30
   attachment:
+    # 附件最大体积（字节，默认 50MB）
     max-size-bytes: 52428800
     allowed-mime-types: image/*,application/pdf,application/zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain
   presence:
+    # 客户端心跳间隔（毫秒）
     heartbeat-interval-ms: 30000
+    # 在线状态 TTL（秒），超时视为离线
     ttl-seconds: 90
   redis-relay:
+    # 是否通过 Redis Pub/Sub 在多实例间同步 IM 事件
     enabled: ${IM_REDIS_RELAY_ENABLED:true}
     channel: im:user-events
 
+# WebRTC 音视频（STUN/TURN）
 webrtc:
   stun-urls: ${WEBRTC_STUN_URLS:stun:localhost:3478}
   turn-urls: ${WEBRTC_TURN_URLS:turn:localhost:3478}
   turn-username: ${COTURN_USERNAME:imturn}
   turn-credential: ${COTURN_PASSWORD:imturnsecret}
 
+# 日志级别
 logging:
   level:
     root: INFO

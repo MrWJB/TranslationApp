@@ -1,0 +1,25 @@
+---
+description: 现代 Python 工程化开发规范
+globs: ["**/*.py"]
+autoAttach: true
+---
+
+# Python 编码规范
+
+## 基础语法与类型
+- 严格遵循 PEP 8 编码规范，使用 4 个空格缩进。
+- 必须使用 Type Hints（类型注解）声明函数参数与返回值。
+- 优先使用 f-string 进行字符串格式化，禁止 `%` 或 `.format()`。
+- 使用 Dataclasses 或 Pydantic 模型替代传统字典传递复杂数据结构。
+
+## 文档与日志
+- 所有模块、类和公共函数必须包含 Docstring（推荐 Google 风格）。
+- 严禁使用 `print()` 进行日志输出，必须使用 `logging` 模块，并配置合理的日志级别。
+
+## 异步与并发
+- I/O 密集型任务必须使用 `asyncio` 和 `async/await` 语法。
+- 禁止在异步上下文中调用同步阻塞函数，必须使用 `run_in_executor`。
+
+## 异常处理
+- 禁止使用裸 `except:`，必须捕获具体异常类型。
+- 资源操作（如文件、网络连接）必须使用 `with` 语句（上下文管理器）确保释放。

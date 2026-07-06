@@ -1,8 +1,9 @@
 -- TranslationApp seed data
 -- Default passwords: admin/admin123, user/user123 (BCrypt hashes below)
+-- Note: DataInitializer also idempotently fills missing menus/permissions and syncs role links on startup.
 USE translation_app;
 
--- Permissions (core modules)
+-- Permissions (core modules) — full set created by DataInitializer when empty
 INSERT INTO permissions (id, code, name, description, module_name, parent_id, sort_order, created_at, updated_at) VALUES
 (1, 'system', '系统管理', '系统管理模块', 'system', NULL, 0, NOW(), NOW()),
 (2, 'system:user', '用户管理', '用户管理权限', 'system', 1, 1, NOW(), NOW()),
@@ -14,7 +15,7 @@ INSERT INTO permissions (id, code, name, description, module_name, parent_id, so
 (8, 'task:create', '创建任务', NULL, 'task', 6, 2, NOW(), NOW())
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- Menus
+-- Menus (minimal bootstrap; DataInitializer ensures the full tree by path)
 INSERT INTO menus (id, name, parent_id, icon, path, component_path, sort_order, is_visible, is_enabled, created_at, updated_at) VALUES
 (1, '首页', NULL, 'HomeFilled', '/dashboard', NULL, 1, 1, 1, NOW(), NOW()),
 (2, '爬取任务', NULL, 'List', '/tasks', NULL, 2, 1, 1, NOW(), NOW()),
@@ -36,7 +37,7 @@ SELECT 1, id FROM permissions;
 INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
 (2, 4), (2, 7), (2, 8);
 
--- Role menus
+-- Role menus (ADMIN gets all current menus; startup sync adds any missing links)
 INSERT IGNORE INTO role_menus (role_id, menu_id)
 SELECT 1, id FROM menus;
 

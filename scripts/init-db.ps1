@@ -5,7 +5,7 @@ param(
     [string]$User = "root",
     [string]$Password = "1234qwer",
     [string]$Database = "translation_app",
-    [string]$MySqlBin = "D:\software\MySQL\MySQL Server 8.4\bin\mysql.exe"
+    [string]$MySqlBin = "D:\software\mysql8.3\bin\mysql.exe"
 )
 
 $ErrorActionPreference = "Stop"

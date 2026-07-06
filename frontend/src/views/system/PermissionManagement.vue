@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { getPermissionTree, createPermission, updatePermission, deletePermission } from '@/api'
+import { getPermissionTree, createPermission, updatePermission, deletePermission, formatApiError } from '@/api'
 import type { Permission, PermissionCreateRequest, PermissionUpdateRequest } from '@/types'
 
 const loading = ref(false)
@@ -90,8 +90,8 @@ const fetchPermissions = async () => {
   loading.value = true
   try {
     permissionTree.value = await getPermissionTree()
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取权限列表失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '获取权限列表失败')
   } finally {
     loading.value = false
   }
@@ -124,8 +124,8 @@ const handleSubmit = async () => {
     }
     dialogVisible.value = false
     fetchPermissions()
-  } catch (e: any) {
-    ElMessage.error(e.message || '操作失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '操作失败')
   }
 }
 
@@ -135,8 +135,8 @@ const handleDelete = async (row: Permission) => {
     await deletePermission(row.id)
     ElMessage.success('删除成功')
     fetchPermissions()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e.message || '删除失败')
+  } catch (error: unknown) {
+    if (error !== 'cancel') ElMessage.error(formatApiError(error) || '删除失败')
   }
 }
 

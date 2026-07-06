@@ -1,0 +1,54 @@
+---
+description: Vue Router 4 路由配置与导航规范
+globs: ["**/router/**/*.ts", "**/router/**/*.js"]
+alwaysApply: false
+---
+
+# Vue Router 4 路由规范
+
+## 路由配置
+- 使用 `createRouter` + `createWebHistory()` 创建路由实例（HTML5 History 模式）
+- 如果需要兼容不支持 History API 的旧服务器，使用 `createWebHashHistory()`
+- 路由配置文件放在 `src/router/index.ts`，按功能模块拆分路由数组后合并
+
+## 路由结构组织
+- 按业务模块组织路由，公共路由、用户路由、管理员路由分开定义后展开合并
+- 每个路由必须包含 `path`、`component`、`name` 三个属性
+- `name` 使用 PascalCase，与组件名保持一致（如 `name: 'UserProfile'`）
+- 404 路由（`/:pathMatch(.*)*`）必须放在路由数组最后
+
+## 懒加载
+- 所有页面级组件必须使用动态 `import()` 懒加载，禁止静态 `import`
+- 同一模块的子路由使用相同的 `webpackChunkName` 注释分组打包
+- 非首屏组件（弹窗、富文本编辑器、图表）使用 `defineAsyncComponent` 包裹
+
+## 路由元信息（meta）
+- 使用 TypeScript 扩展 `RouteMeta` 接口，定义项目中所有 meta 字段
+- 常用 meta 字段：`title`（页面标题）、`requiresAuth`（是否需要登录）、`roles`（角色权限）
+- 在全局前置守卫中统一读取 meta 处理鉴权和页面标题
+
+## 导航守卫
+- 全局前置守卫（`router.beforeEach`）统一处理鉴权、权限校验、页面标题设置
+- 禁止使用已废弃的 `next()` 回调，直接 `return` 路由对象或 `false`
+- 守卫中的异步操作必须使用 `async/await`，确保等待完成后再放行
+- 防止无限重定向：鉴权守卫中必须判断目标路由，避免已登录用户重定向到登录页
+
+## 路由参数变化
+- 同一组件不同参数切换时（如 `/user/1` → `/user/2`），组件不会重新挂载
+- 必须使用 `watch(() => route.params.id, ...)` 监听参数变化并重新获取数据
+- 或者使用 `:key="route.fullPath"` 强制重新渲染（简单但性能稍差）
+
+## 编程式导航
+- 跳转使用 `router.push()`，替换使用 `router.replace()`
+- 优先使用命名路由跳转（`router.push({ name: 'UserProfile', params: { id } })`），便于重构
+- 返回上一页使用 `router.back()` 或 `router.go(-1)`
+
+## 嵌套路由与布局
+- 使用嵌套路由实现布局复用（如侧边栏 + 内容区）
+- 父路由的 `component` 指向布局组件，子路由渲染在父组件的 `<router-view />` 中
+- 需要多个视图时使用命名视图（`<router-view name="sidebar" />`）
+
+## TypeScript 类型安全
+- 扩展 `RouteMeta` 接口声明 meta 类型
+- 路由配置数组使用 `RouteRecordRaw[]` 类型标注
+- 组件内使用 `useRouter()` 和 `useRoute()` 获取路由实例，必须声明返回类型

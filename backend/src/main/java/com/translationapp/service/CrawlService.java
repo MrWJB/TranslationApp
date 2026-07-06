@@ -9,7 +9,9 @@ import com.translationapp.entity.CrawlTask;
 import com.translationapp.entity.Document;
 import com.translationapp.repository.CrawlTaskRepository;
 import com.translationapp.repository.DocumentRepository;
-import com.translationapp.translator.DeepLTranslator;
+import com.translationapp.translator.DocumentTranslator;
+import com.translationapp.translator.TranslationFailedException;
+import com.translationapp.translator.TranslationMarkers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +25,8 @@ import com.translationapp.util.SiteKeyUtil;
 import org.jsoup.Jsoup;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,7 +50,7 @@ public class CrawlService {
     );
 
     private final NodeCrawlerService nodeCrawlerService;
-    private final DeepLTranslator translator;
+    private final DocumentTranslator translator;
     private final LocalDocumentStorage localDocumentStorage;
     private final DocumentTocBuilder documentTocBuilder;
     private final DocumentNavParser documentNavParser;
@@ -525,7 +529,75 @@ public class CrawlService {
         }
     }
 
+    /**
+     * Re-translate task documents from stored originals (e.g. after fixing DeepL auth).
+     *
+     * @param taskId     crawl task id
+     * @param onlyFailed when true, only pages whose translated HTML contains a prior failure marker
+     */
     @Transactional
+    public Map<String, Object> retranslateTaskDocuments(Long taskId, boolean onlyFailed) {
+        if (!translator.isConfigured()) {
+            throw new IllegalStateException(
+                    "No translation provider configured; set translation.provider and credentials in application.yml");
+        }
+        CrawlTask task = getTask(taskId);
+        List<Document> documents = documentRepository.findByCrawlTaskIdOrderBySortOrderAsc(taskId);
+        int attempted = 0;
+        int translated = 0;
+        int skipped = 0;
+        int failed = 0;
+
+        for (Document doc : documents) {
+            if (onlyFailed && !hasFailedTranslation(doc)) {
+                skipped++;
+                continue;
+            }
+            attempted++;
+            if (translatePageDocument(doc)) {
+                documentRepository.save(doc);
+                translated++;
+            } else {
+                failed++;
+            }
+            if (translationDelayMs > 0) {
+                try {
+                    Thread.sleep(translationDelayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        log.info(
+                "Retranslate task {}: attempted={}, translated={}, skipped={}, failed={}",
+                taskId,
+                attempted,
+                translated,
+                skipped,
+                failed);
+        return Map.of(
+                "taskId", task.getId(),
+                "onlyFailed", onlyFailed,
+                "attempted", attempted,
+                "translated", translated,
+                "skipped", skipped,
+                "failed", failed,
+                "message", "Retranslation finished");
+    }
+
+    private boolean hasFailedTranslation(Document doc) {
+        String translatedPath = doc.getTranslatedLocalPath();
+        if (translatedPath != null && !translatedPath.isBlank()) {
+            String html = localDocumentStorage.readHtml(translatedPath).orElse("");
+            if (TranslationMarkers.containsFailureMarker(html)) {
+                return true;
+            }
+        }
+        return TranslationMarkers.containsFailureMarker(doc.getTranslatedContent());
+    }
+
     public CrawlTask rebuildTaskTableOfContents(Long taskId) {
         CrawlTask task = getTask(taskId);
         List<Document> documents = documentRepository.findByCrawlTaskIdOrderBySortOrderAsc(taskId);
@@ -552,19 +624,19 @@ public class CrawlService {
         }
         String normalizedPath = localPath.replace('\\', '/');
         
-        // 排除非分类目录
+        // 排除资源目录
         if (normalizedPath.startsWith("_/") || 
             normalizedPath.startsWith("images/") ||
             normalizedPath.startsWith("images\\")) {
             return "other";
         }
         
-        // 根目录下的文件（不含 /）是 Spring Framework 核心文档，归为 spring
+        // 根目录文件（如 Spring Framework 概览页）归为 spring
         if (!normalizedPath.contains("/")) {
             return "spring";
         }
         
-        // 提取第一级目录作为分类
+        // 根据第一级目录分类
         String firstDir = normalizedPath.split("/")[0];
         
         switch (firstDir) {
@@ -647,17 +719,30 @@ public class CrawlService {
             org.jsoup.nodes.Element main = htmlDoc.selectFirst("main.article");
             if (main != null) {
                 String translatedMain = translator.translateHtmlToChinese(main.html());
+                if (TranslationMarkers.containsFailureMarker(translatedMain)) {
+                    log.warn("Translation produced failure marker for {}, skipping write", localPath);
+                    return false;
+                }
                 main.html(translatedMain);
             } else {
                 String translatedBody = translator.translateHtmlToChinese(htmlDoc.body().html());
+                if (TranslationMarkers.containsFailureMarker(translatedBody)) {
+                    log.warn("Translation produced failure marker for {}, skipping write", localPath);
+                    return false;
+                }
                 htmlDoc.body().html(translatedBody);
             }
+
+            fixImageUrls(htmlDoc, localPath);
 
             String translatedPath = localDocumentStorage.translatedRelativePath(localPath);
             localDocumentStorage.writeHtml(translatedPath, htmlDoc.outerHtml());
             doc.setTranslatedLocalPath(translatedPath);
             log.info("Translated document: {} -> {}", localPath, translatedPath);
             return true;
+        } catch (TranslationFailedException e) {
+            log.warn("Failed to translate document {}: {}", localPath, e.getMessage());
+            return false;
         } catch (IOException e) {
             log.warn("Failed to translate document {}: {}", localPath, e.getMessage());
             return false;
@@ -665,14 +750,39 @@ public class CrawlService {
     }
 
     /**
-     * Fix relative image URLs to absolute URLs based on the page URL
+     * Rewrite relative image URLs so iframe preview can load assets from the backend.
      */
-    private String fixImageUrls(String html, String pageUrl) {
-        String baseUrl = pageUrl.substring(0, pageUrl.lastIndexOf('/') + 1);
-        // Fix <img src="..."> with relative paths (not starting with http:// or https://)
-        html = html.replaceAll("<img\\s+([^>]*?)src=\"(?!https?:)([^\"]+)\"", 
-            "<img $1src=\"" + baseUrl + "$2\"");
-        return html;
+    void fixImageUrls(org.jsoup.nodes.Document htmlDoc, String localPath) {
+        if (htmlDoc == null || localPath == null || localPath.isBlank()) {
+            return;
+        }
+
+        String normalizedPath = localPath.replace('\\', '/');
+        int lastSlash = normalizedPath.lastIndexOf('/');
+        String docDir = lastSlash >= 0 ? normalizedPath.substring(0, lastSlash + 1) : "";
+
+        for (org.jsoup.nodes.Element img : htmlDoc.select("img[src]")) {
+            String src = img.attr("src").trim();
+            if (src.isEmpty()
+                    || src.startsWith("http://")
+                    || src.startsWith("https://")
+                    || src.startsWith("/api/crawl/")
+                    || src.startsWith("data:")) {
+                continue;
+            }
+
+            String assetPath = resolveRelativeAssetPath(docDir, src);
+            img.attr("src", "/api/crawl/assets/" + assetPath);
+        }
+    }
+
+    private String resolveRelativeAssetPath(String docDir, String relativeSrc) {
+        Path resolved = Paths.get(docDir, relativeSrc).normalize();
+        String normalized = resolved.toString().replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
     }
 
     /**

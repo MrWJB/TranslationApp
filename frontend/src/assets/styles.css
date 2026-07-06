@@ -1254,16 +1254,18 @@ html.dark .el-select__caret {
   color: var(--text-secondary);
 }
 
-[data-theme="dark"] .el-switch {
+[data-theme="dark"] .el-switch__label {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-switch__core {
+  border-color: var(--border-color);
   background-color: var(--border-color);
 }
 
-[data-theme="dark"] .el-switch.is-active {
+[data-theme="dark"] .el-switch.is-checked .el-switch__core {
+  border-color: var(--primary-color);
   background-color: var(--primary-color);
-}
-
-[data-theme="dark"] .el-switch__label {
-  color: var(--text-primary);
 }
 
 [data-theme="dark"] .el-button {

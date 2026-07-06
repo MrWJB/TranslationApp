@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { LoginRequest, LoginResponse, RegisterRequest, PhoneRegisterRequest, OAuthProviderInfo, CaptchaResponse, CrawlTask, Document, TocItem, SystemUser, UserCreateRequest, UserUpdateRequest, PasswordResetRequest, Role, RoleCreateRequest, RoleUpdateRequest, Permission, PermissionCreateRequest, PermissionUpdateRequest, Menu, MenuCreateRequest, MenuUpdateRequest } from '@/types'
+import type { LoginRequest, LoginResponse, RegisterRequest, PhoneRegisterRequest, OAuthProviderInfo, CaptchaResponse, CrawlTask, Document, TocItem, SystemUser, UserCreateRequest, UserUpdateRequest, PasswordResetRequest, Role, RoleCreateRequest, RoleUpdateRequest, Permission, PermissionCreateRequest, PermissionUpdateRequest, Menu, MenuCreateRequest, MenuUpdateRequest, UserProfile, UserProfileUpdateRequest, ChangePasswordRequest, RealNameVerifyRequest } from '@/types'
 
 export const api = axios.create({
   baseURL: '/api',
@@ -241,6 +241,31 @@ export const deleteUser = (id: number): Promise<void> => {
   return api.delete(`/admin/users/${id}`)
 }
 
+// User Profile APIs
+export const getUserProfile = (): Promise<UserProfile> => {
+  return api.get('/user/profile')
+}
+
+export const updateUserProfile = (data: UserProfileUpdateRequest): Promise<UserProfile> => {
+  return api.put('/user/profile', data)
+}
+
+export const uploadUserAvatar = (file: File): Promise<UserProfile> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/user/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const verifyRealName = (data: RealNameVerifyRequest): Promise<UserProfile> => {
+  return api.post('/user/real-name-verify', data)
+}
+
+export const changePassword = (data: ChangePasswordRequest): Promise<{ message: string }> => {
+  return api.post('/user/password', data)
+}
+
 // System Management APIs - Roles
 export const getRoles = (): Promise<Role[]> => {
   return api.get('/admin/roles')
@@ -288,6 +313,10 @@ export const deletePermission = (id: number): Promise<void> => {
 }
 
 // System Management APIs - Menus
+export const getUserMenuTree = (): Promise<Menu[]> => {
+  return api.get('/user/menus')
+}
+
 export const getMenus = (): Promise<Menu[]> => {
   return api.get('/admin/menus')
 }

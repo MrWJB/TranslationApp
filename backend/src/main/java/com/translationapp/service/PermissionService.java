@@ -2,19 +2,26 @@ package com.translationapp.service;
 
 import com.translationapp.dto.*;
 import com.translationapp.entity.Permission;
+import com.translationapp.entity.Role;
 import com.translationapp.repository.PermissionRepository;
+import com.translationapp.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PermissionService {
+    private static final String ADMIN_ROLE_NAME = "ADMIN";
+
     private final PermissionRepository permissionRepository;
+    private final RoleRepository roleRepository;
 
     public List<PermissionDTO> findAll() {
         return permissionRepository.findAll().stream()
@@ -91,6 +98,18 @@ public class PermissionService {
         }
 
         permissionRepository.delete(permission);
+    }
+
+    /** 启动时及新增权限后，确保 ADMIN 拥有全部权限。 */
+    @Transactional
+    public void syncAdminRolePermissions() {
+        roleRepository.findByName(ADMIN_ROLE_NAME).ifPresent(role -> {
+            Set<Permission> allPermissions = new HashSet<>(permissionRepository.findAll());
+            if (!role.getPermissions().equals(allPermissions)) {
+                role.setPermissions(allPermissions);
+                roleRepository.save(role);
+            }
+        });
     }
 
     private PermissionDTO toDTO(Permission permission) {

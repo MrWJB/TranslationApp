@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS users (
     phone_verified BIT(1) DEFAULT 0,
     real_name VARCHAR(255) NULL,
     avatar VARCHAR(255) NULL,
+    gender VARCHAR(16) NULL DEFAULT 'UNKNOWN',
+    birth_date DATE NULL,
+    province VARCHAR(64) NULL,
+    city VARCHAR(64) NULL,
+    id_card_number VARCHAR(32) NULL,
+    real_name_verified BIT(1) DEFAULT 0,
     is_enabled BIT(1) DEFAULT 1,
     is_locked BIT(1) DEFAULT 0,
     last_login_time DATETIME(6) NULL,
@@ -158,3 +164,37 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX idx_documents_task_id ON documents (task_id);
 CREATE INDEX idx_documents_local_path ON documents (local_path(255));
 CREATE INDEX idx_crawl_tasks_status ON crawl_tasks (status);
+
+CREATE TABLE IF NOT EXISTS user_login_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    login_time DATETIME(6) NOT NULL,
+    ip_address VARCHAR(64) NULL,
+    province VARCHAR(64) NULL,
+    city VARCHAR(64) NULL,
+    PRIMARY KEY (id),
+    KEY idx_login_log_time (login_time),
+    KEY idx_login_log_user (user_id),
+    CONSTRAINT fk_login_log_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS analytics_online_snapshot (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    snapshot_time DATETIME(6) NOT NULL,
+    online_count INT NOT NULL DEFAULT 0,
+    total_users INT NOT NULL DEFAULT 0,
+    male_online INT NOT NULL DEFAULT 0,
+    female_online INT NOT NULL DEFAULT 0,
+    other_online INT NOT NULL DEFAULT 0,
+    unknown_online INT NOT NULL DEFAULT 0,
+    age_under_18 INT NOT NULL DEFAULT 0,
+    age_18_24 INT NOT NULL DEFAULT 0,
+    age_25_34 INT NOT NULL DEFAULT 0,
+    age_35_44 INT NOT NULL DEFAULT 0,
+    age_45_54 INT NOT NULL DEFAULT 0,
+    age_55_plus INT NOT NULL DEFAULT 0,
+    region_stats_json TEXT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_snapshot_time (snapshot_time),
+    KEY idx_snapshot_time (snapshot_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

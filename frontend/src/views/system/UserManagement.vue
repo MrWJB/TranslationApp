@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, getRoles } from '@/api'
+import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, getRoles, formatApiError } from '@/api'
 import type { SystemUser, UserCreateRequest, UserUpdateRequest, Role } from '@/types'
 
 const loading = ref(false)
@@ -143,8 +143,8 @@ const fetchUsers = async () => {
     const res = await getUsers(currentPage.value - 1, pageSize.value)
     users.value = res.content
     total.value = res.totalElements
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取用户列表失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '获取用户列表失败')
   } finally {
     loading.value = false
   }
@@ -153,8 +153,8 @@ const fetchUsers = async () => {
 const fetchRoles = async () => {
   try {
     roles.value = await getRoles()
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取角色列表失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '获取角色列表失败')
   }
 }
 
@@ -185,8 +185,8 @@ const handleSubmit = async () => {
     }
     dialogVisible.value = false
     fetchUsers()
-  } catch (e: any) {
-    ElMessage.error(e.message || '操作失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '操作失败')
   }
 }
 
@@ -196,8 +196,8 @@ const handleDelete = async (row: SystemUser) => {
     await deleteUser(row.id)
     ElMessage.success('删除成功')
     fetchUsers()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e.message || '删除失败')
+  } catch (error: unknown) {
+    if (error !== 'cancel') ElMessage.error(formatApiError(error) || '删除失败')
   }
 }
 
@@ -214,8 +214,8 @@ const handlePasswordSubmit = async () => {
     await resetUserPassword(passwordUserId.value!, { newPassword: passwordForm.newPassword })
     ElMessage.success('密码重置成功')
     passwordDialogVisible.value = false
-  } catch (e: any) {
-    ElMessage.error(e.message || '密码重置失败')
+  } catch (error: unknown) {
+    ElMessage.error(formatApiError(error) || '密码重置失败')
   }
 }
 

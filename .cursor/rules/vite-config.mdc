@@ -1,0 +1,55 @@
+---
+description: Vite 项目工程化与构建配置规范
+globs: ["**/vite.config.*"]
+alwaysApply: false
+---
+
+# Vite 构建配置规范
+
+## 基础配置
+- 使用 `defineConfig` 包裹配置对象，确保类型提示
+- 生产环境禁用 `sourcemap`（`build.sourcemap = false`），防止源码泄露
+- 设置合理的 `build.target`（推荐 `es2022` 或 `esnext`）
+- 配置 `resolve.alias`，使用 `@` 指向 `src` 目录，避免深层相对路径
+
+## 依赖预构建（optimizeDeps）
+- 将高频使用的核心依赖（vue、vue-router、pinia、axios）加入 `include` 列表
+- 排除不需要预构建的大型依赖（如 `lodash-es`），减少预构建时间
+- 使用 `force: true` 在依赖变更后强制重新预构建
+
+## 代码分割（manualChunks）
+- 在 `build.rollupOptions.output.manualChunks` 中手动拆分第三方库
+- 至少拆分为：`vue-vendor`（vue + vue-router + pinia）、`ui-vendor`（UI 组件库）、`utils-vendor`（工具库）
+- 防止单个 chunk 过大导致加载阻塞
+
+## 资源处理
+- 配置 `build.assetsDir` 指定静态资源输出目录（默认 `assets`）
+- 小图片（< 4KB）使用 `assetsInlineLimit` 内联为 base64，减少请求数
+- 图片使用 WebP 格式 + `loading="lazy"` 懒加载
+- 字体文件使用 `font-display: swap` 防止 FOIT
+
+## 压缩与优化
+- 使用 `vite-plugin-compression` 开启 gzip/brotli 压缩（超过 10KB 的文件才压缩）
+- UI 组件库（Element Plus、Ant Design Vue）必须按需引入，禁止全量导入
+- 使用 `unplugin-vue-components` + Resolver 实现组件自动按需导入
+- 生产环境启用 CSS 代码分割和 Tree Shaking
+
+## 多环境配置
+- 使用 `.env.development`、`.env.production`、`.env.staging` 管理环境变量
+- 自定义变量必须以 `VITE_` 前缀开头才能在客户端代码中访问
+- API 地址、CDN 域名等通过环境变量注入，禁止硬编码
+
+## 开发服务器
+- 配置 `server.host: true` 允许局域网访问
+- 配置 `server.proxy` 代理 API 请求，解决开发环境跨域问题
+- 代理配置中设置 `changeOrigin: true`
+
+## 性能门禁
+- 构建产物中单个 vendor chunk 不超过 500KB，超出需进一步拆分
+- CI 流程中加入 Lighthouse CI 扫描，监控 LCP、CLS、FID 等核心指标
+- 使用 `rollup-plugin-visualizer` 分析打包体积，定期清理无用依赖
+
+## 部署配置
+- 部署到子目录时必须设置 `base: '/subdir/'`，否则静态资源 404
+- `publicDir`（默认 `public`）存放无需构建处理的文件（如 `favicon.ico`、`robots.txt`）
+- `assetsDir`（默认 `assets`）存放经构建处理的资源，两者职责不可混淆

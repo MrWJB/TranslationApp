@@ -1,6 +1,8 @@
-# Optional H2 profile for local development without MySQL
+# H2 Profile：无需 MySQL 的本地开发
+# 激活方式：SPRING_PROFILES_ACTIVE=h2
 spring:
   datasource:
+    # 嵌入式 H2 文件库，数据保存在 ./data/translationdb
     url: jdbc:h2:file:./data/translationdb;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
@@ -8,11 +10,13 @@ spring:
 
   h2:
     console:
+      # 启用 H2 Web 控制台：http://localhost:8080/h2-console
       enabled: true
       path: /h2-console
 
   jpa:
     hibernate:
+      # 开发模式自动同步表结构
       ddl-auto: update
     properties:
       hibernate:

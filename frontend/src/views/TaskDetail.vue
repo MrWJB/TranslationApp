@@ -100,7 +100,7 @@
                   :class="tocNodeClass(data)"
                   @click.stop="handleNodeClick(data)"
                 >
-                  <el-icon v-if="data.level === 0" style="margin-right: 4px"><Document /></el-icon>
+                  <el-icon v-if="data.level === 0" style="margin-right: 4px"><DocumentIcon /></el-icon>
                   <el-icon v-else-if="data.level <= 2" style="margin-right: 4px"><Folder /></el-icon>
                   <el-icon v-else style="margin-right: 4px"><Tickets /></el-icon>
                   <span class="custom-tree-node__title">{{ node.label }}</span>
@@ -120,7 +120,7 @@
                 :class="tocNodeClass(data)"
                 @click.stop="handleNodeClick(data)"
               >
-                <el-icon v-if="data.level === 0" style="margin-right: 4px"><Document /></el-icon>
+                <el-icon v-if="data.level === 0" style="margin-right: 4px"><DocumentIcon /></el-icon>
                 <el-icon v-else-if="data.level <= 2" style="margin-right: 4px"><Folder /></el-icon>
                 <el-icon v-else style="margin-right: 4px"><Tickets /></el-icon>
                 <span class="custom-tree-node__title">{{ node.label }}</span>
@@ -240,6 +240,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTask, getTaskDocuments, getTableOfContents, getDocumentById, rebuildTaskToc, formatApiError } from '@/api'
+import { Document as DocumentIcon, Folder } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { CrawlTask, Document } from '@/types'
 import { useThemeStore } from '@/stores/theme'
@@ -428,8 +429,7 @@ const resolveDocumentForPath = async (targetPath: string): Promise<Document | nu
   if (!doc && tocNode.id) {
     try {
       doc = await getDocumentById(tocNode.id)
-    } catch (err) {
-      console.error('Failed to load document:', err)
+    } catch {
       return null
     }
   }
@@ -526,8 +526,8 @@ const finishTaskLoad = async () => {
 const loadTask = async () => {
   try {
     task.value = await getTask(taskId)
-  } catch (err) {
-    console.error('Failed to load task:', err)
+  } catch {
+    // 任务加载失败时不阻塞页面
   }
 }
 
@@ -535,8 +535,8 @@ const loadDocuments = async () => {
   try {
     const result = await getTaskDocuments(taskId)
     documents.value = result.documents || []
-  } catch (err) {
-    console.error('Failed to load documents:', err)
+  } catch {
+    // 文档列表加载失败时使用空列表
   }
 }
 
@@ -549,8 +549,7 @@ const loadTableOfContents = async () => {
     } else {
       buildTocFallback()
     }
-  } catch (err) {
-    console.error('Failed to load TOC:', err)
+  } catch {
     buildTocFallback()
   }
 }
@@ -619,8 +618,7 @@ const handleNodeClick = async (data: TocNavNode) => {
   if (!doc && data.id) {
     try {
       doc = await getDocumentById(data.id)
-    } catch (err) {
-      console.error('Failed to load document:', err)
+    } catch {
       return
     }
   }

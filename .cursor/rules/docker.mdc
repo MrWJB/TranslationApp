@@ -1,0 +1,44 @@
+
+---
+
+### Docker 规范 (`.cursor/rules/docker.mdc`)
+
+```markdown
+---
+description: Docker 容器化与镜像构建规范
+globs: ["**/Dockerfile*", "**/docker-compose*.yml"]
+alwaysApply: false
+---
+
+# Docker 编码规范
+
+## Dockerfile 规范
+- 基础镜像必须指定具体版本标签（如 `node:20.11-alpine`），禁止使用 `latest`
+- 优先使用 Alpine 或 Distroless 等精简镜像，减小镜像体积
+- 多阶段构建（Multi-stage Build）：构建阶段和运行阶段分离，最终镜像只包含运行时依赖
+- 每条 `RUN` 指令合并多个命令（用 `&&` 连接），减少镜像层数
+- 清理缓存：`RUN apt-get update && apt-get install -y xxx && rm -rf /var/lib/apt/lists/*`
+
+## 构建优化
+- 将不常变动的指令（安装依赖）放在前面，频繁变动的指令（复制代码）放在后面，利用缓存
+- 使用 `.dockerignore` 排除无关文件（`node_modules`、`.git`、日志等）
+- `COPY` 只复制必要文件，禁止 `COPY . .`（除非项目极简）
+- `WORKDIR` 设置工作目录，禁止使用 `cd` 切换目录
+
+## 安全
+- 禁止使用 `root` 用户运行应用，创建专用用户：`RUN adduser --disabled-password appuser && USER appuser`
+- 禁止在镜像中存储密钥、证书等敏感信息，使用 Docker Secrets 或环境变量注入
+- 扫描镜像漏洞：CI 中使用 `trivy` 或 `snyk` 扫描
+- 设置 `HEALTHCHECK` 指令，便于编排工具检测容器健康状态
+
+## docker-compose 规范
+- 使用 Compose V2 语法（`docker compose` 而非 `docker-compose`）
+- 服务命名使用 snake_case（如 `api_server`、`redis_cache`）
+- 环境变量使用 `.env` 文件管理，禁止在 compose 文件中硬编码
+- 网络隔离：不同服务组使用独立网络，避免不必要的互通
+- 数据持久化使用命名卷（Named Volume），禁止绑定宿主机绝对路径（可移植性差）
+
+## 资源限制
+- 生产环境必须设置资源限制：`deploy.resources.limits`（CPU、内存）
+- 设置重启策略：`restart: unless-stopped` 或 `restart: on-failure`
+- 日志驱动配置：限制日志大小防止磁盘写满（`max-size: 10m`、`max-file: 3`）

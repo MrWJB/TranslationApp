@@ -1,0 +1,55 @@
+---
+description: Pinia 状态管理编码规范
+globs: ["**/store/**/*.ts", "**/stores/**/*.ts"]
+alwaysApply: false
+---
+
+# Pinia 状态管理规范
+
+## 核心原则
+- 每个 Store 代表一个独立的业务域（如 `user`、`cart`、`notification`），禁止创建"万能 Store"
+- Store 命名使用 `use` 前缀 + 业务名 + Store（如 `useUserStore`、`useCartStore`）
+- 禁止按页面或组件拆分 Store（如 `useHeaderStore`、`useHomeStore` 是错误的）
+- UI 局部状态（如弹窗开关）使用组件内 `ref`，不要放入 Pinia
+
+## Store 定义方式
+- 优先使用 Setup Store（组合式写法 `defineStore('id', () => {...})`），更灵活且支持 Composable
+- 如果团队熟悉 Vuex 且不需要 Composable，可使用 Options Store
+- 同一项目内保持统一，禁止混用两种写法
+
+## 状态所有权
+| 状态类型 | 管理方案 | 原因 |
+|---|---|---|
+| 服务端/API 数据 | React Query / TanStack Query | 自带缓存、同步、加载状态 |
+| 共享客户端状态 | Pinia | 响应式、DevTools、持久化 |
+| 组件局部状态 | `ref()` / `reactive()` | 简单、无额外开销 |
+| URL 状态（筛选/分页） | Route query params | 可分享、可书签 |
+
+## 关键规则
+- **禁止将 API 响应直接存入 Pinia**，服务端数据应使用专门的数据获取方案（如 TanStack Query）
+- **解构 Store 时必须使用 `storeToRefs()`**，直接解构会丢失响应式
+- Actions 方法可直接解构，它们是普通函数不依赖响应式上下文
+- Setup Store 中**必须返回所有 state 属性**，私有 state 会破坏 SSR 和 DevTools
+- Store 文件只使用**命名导出**（`export const useXxxStore`），禁止 `export default`
+- 禁止在 state 中使用魔法数字，必须定义命名常量
+
+## 状态修改规范
+- 所有状态变更必须通过 Action 进行，禁止在组件中直接 `store.xxx = value`
+- 批量更新优先使用 `$patch({ a: 1, b: 2 })`
+- 需要依赖当前值更新时，使用函数式 `$patch(state => { state.count++ })`
+- Getters 必须是纯函数（同步、无副作用），异步逻辑放入 Action
+
+## Store 组合
+- Store 之间可以互相引用，但必须避免循环依赖
+- 通用逻辑（如请求封装、错误重试）提取为独立 Composable，Store 中直接调用
+- 禁止创建 `baseStore` 继承链，Pinia 鼓励组合而非继承
+
+## 持久化
+- 使用 `pinia-plugin-persistedstate` 插件实现状态持久化
+- 仅持久化用户偏好和非敏感数据（如主题、语言），禁止持久化服务端数据
+- 使用 `paths` 选项精确控制持久化字段，不要整个 Store 持久化
+
+## TypeScript 类型
+- 必须为 State 定义独立的 `interface`（如 `interface UserState`）
+- Getters 和 Actions 的参数与返回值必须有明确的类型标注
+- 使用泛型约束 `defineStore<'id', State, Getters, Actions>(...)`

@@ -58,9 +58,11 @@ Or use the helper script (uses MySQL 8.4 bin path by default):
 | `MYSQL_DATABASE` | `translation_app` | Database name |
 | `MYSQL_USER` | `root` | DB username |
 | `MYSQL_PASSWORD` | `1234qwer` | DB password |
-| `DEEPL_API_KEY` | — | DeepL API key for EN→ZH translation |
-| `DEEPL_API_URL` | `https://api-free.deepl.com/v2/translate` | DeepL endpoint |
+| `DEEPL_API_KEY` | — | DeepL API key for EN→ZH translation (Free keys end with `:fx`) |
+| `DEEPL_API_URL` | `https://api-free.deepl.com/v2/translate` | DeepL endpoint (`:fx` keys → Free URL; Pro keys → `https://api.deepl.com/v2/translate`; auto-corrected if mismatched) |
 | `TRANSLATION_ON_CRAWL` | `true` | Translate pages during crawl |
+
+See [docs/DOCUMENT_TRANSLATION.md](docs/DOCUMENT_TRANSLATION.md) for architecture, data flow, and how translation is triggered.
 | `SEED_DEFAULT_USERS` | `true` | Seed admin/user on startup if tables empty |
 | `DEFAULT_ADMIN_PASSWORD` | `admin123` | Admin password (runtime seed) |
 | `JPA_DDL_AUTO` | `validate` | Set to `update` for dev schema sync |

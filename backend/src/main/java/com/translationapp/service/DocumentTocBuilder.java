@@ -1,6 +1,7 @@
 package com.translationapp.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.translationapp.util.SiteKeyUtil;
@@ -16,6 +17,7 @@ import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentTocBuilder {
 
     private final DocumentNavParser navParser;
@@ -424,8 +426,8 @@ public class DocumentTocBuilder {
         if (value != null) {
             try {
                 return Integer.parseInt(value.toString());
-            } catch (NumberFormatException ignored) {
-                // fall through
+            } catch (NumberFormatException e) {
+                log.debug("Unable to parse integer value '{}', using default {}", value, defaultValue);
             }
         }
         return defaultValue;

@@ -23,11 +23,14 @@ if (-not (Test-PortListening 3000)) {
 Start-Sleep -Seconds 2
 
 if (-not (Test-PortListening 8080)) {
-    Start-Process powershell -ArgumentList @(
-        "-NoExit",
-        "-Command",
-        "Set-Location '$Root\backend'; Write-Host 'Backend (port 8080)'; mvn spring-boot:run -DskipTests"
-    )
+    $backendCmd = @"
+Set-Location '$Root\backend'
+`$env:MYSQL_HOST='127.0.0.1'
+`$env:JAVA_TOOL_OPTIONS='-Djava.net.useSystemProxies=false -DsocksNonProxyHosts=localhost|127.0.0.1|*'
+Write-Host 'Backend (port 8080)'
+mvn spring-boot:run -DskipTests '-Dspring-boot.run.jvmArguments=-Djava.net.useSystemProxies=false -DsocksNonProxyHosts=localhost|127.0.0.1|*'
+"@
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $backendCmd)
     Write-Host "Started backend on port 8080"
 } else {
     Write-Host "Backend already listening on port 8080"

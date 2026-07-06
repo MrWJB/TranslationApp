@@ -3,7 +3,6 @@ package com.translationapp.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -16,9 +15,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Node.js 爬虫服务客户端，封装类型识别、文档/视频爬取、异步任务轮询等 HTTP 调用。
+ */
 @Slf4j
 @Service
 public class NodeCrawlerService {
+
+    private static final long ASYNC_CRAWL_TIMEOUT_MS = 3 * 60 * 60 * 1000L;
+    private static final int ASYNC_UNKNOWN_PROGRESS_LIMIT = 10;
+    private static final long ASYNC_POLL_INTERVAL_MS = 1200L;
 
     private final RestTemplate restTemplate;
     private final RestTemplate crawlerProgressRestTemplate;
@@ -37,77 +43,74 @@ public class NodeCrawlerService {
     private String nodeServiceUrl;
 
     /**
-     * Identify task type from URL
+     * 调用 Node 爬虫服务识别 URL 对应的任务类型。
+     *
+     * @param url 目标 URL
+     * @return 任务类型识别结果
      */
     public TaskTypeInfo identifyTaskType(String url) {
         log.info("Calling Node.js crawler service to identify task type for URL: {}", url);
 
         try {
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("url", url);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<String> responseEntity = restTemplate.exchange(
-                    nodeServiceUrl + "/identify-type",
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            String response = responseEntity.getBody();
+            String response = postJson("/identify-type", Map.of("url", url));
             if (response == null || response.isEmpty()) {
                 log.warn("Empty response from type identification service, defaulting to document");
-                return new TaskTypeInfo("document", 0.5, "No response from service");
+                return defaultTaskTypeInfo("No response from service");
             }
 
-            JsonNode rootNode = objectMapper.readTree(response);
-            
-            String taskType = rootNode.has("taskType") ? rootNode.get("taskType").asText() : "document";
-            double confidence = rootNode.has("confidence") ? rootNode.get("confidence").asDouble() : 0.5;
-            String reason = rootNode.has("reason") ? rootNode.get("reason").asText() : "";
-            
-            // Get suggestions
-            Map<String, List<String>> suggestions = new HashMap<>();
-            if (rootNode.has("suggestions")) {
-                JsonNode suggestionsNode = rootNode.get("suggestions");
-                if (suggestionsNode.has("document")) {
-                    JsonNode docNode = suggestionsNode.get("document");
-                    if (docNode.has("categories")) {
-                        List<String> docCategories = new ArrayList<>();
-                        for (JsonNode cat : docNode.get("categories")) {
-                            docCategories.add(cat.asText());
-                        }
-                        suggestions.put("document", docCategories);
-                    }
-                }
-                if (suggestionsNode.has("video")) {
-                    JsonNode videoNode = suggestionsNode.get("video");
-                    if (videoNode.has("categories")) {
-                        List<String> videoCategories = new ArrayList<>();
-                        for (JsonNode cat : videoNode.get("categories")) {
-                            videoCategories.add(cat.asText());
-                        }
-                        suggestions.put("video", videoCategories);
-                    }
-                }
-            }
-
-            log.info("Identified task type: {} with confidence: {}", taskType, confidence);
-            return new TaskTypeInfo(taskType, confidence, reason, suggestions);
+            TaskTypeInfo taskTypeInfo = parseTaskTypeInfo(objectMapper.readTree(response));
+            log.info("Identified task type: {} with confidence: {}", taskTypeInfo.getType(), taskTypeInfo.getConfidence());
+            return taskTypeInfo;
         } catch (RestClientException e) {
             log.error("HTTP error calling type identification service: {}", e.getMessage());
-            return new TaskTypeInfo("document", 0.5, "Service unavailable: " + e.getMessage());
+            return defaultTaskTypeInfo("Service unavailable: " + e.getMessage());
         } catch (Exception e) {
             log.error("Failed to identify task type: {}", e.getMessage(), e);
-            return new TaskTypeInfo("document", 0.5, "Error: " + e.getMessage());
+            return defaultTaskTypeInfo("Error: " + e.getMessage());
         }
     }
 
+    private TaskTypeInfo defaultTaskTypeInfo(String reason) {
+        return new TaskTypeInfo("document", 0.5, reason);
+    }
+
+    private TaskTypeInfo parseTaskTypeInfo(JsonNode rootNode) {
+        String taskType = rootNode.has("taskType") ? rootNode.get("taskType").asText() : "document";
+        double confidence = rootNode.has("confidence") ? rootNode.get("confidence").asDouble() : 0.5;
+        String reason = rootNode.has("reason") ? rootNode.get("reason").asText() : "";
+        Map<String, List<String>> suggestions = parseTypeSuggestions(rootNode.path("suggestions"));
+        return new TaskTypeInfo(taskType, confidence, reason, suggestions);
+    }
+
+    private Map<String, List<String>> parseTypeSuggestions(JsonNode suggestionsNode) {
+        Map<String, List<String>> suggestions = new HashMap<>();
+        if (suggestionsNode.isMissingNode()) {
+            return suggestions;
+        }
+
+        appendCategorySuggestions(suggestions, suggestionsNode.path("document"), "document");
+        appendCategorySuggestions(suggestions, suggestionsNode.path("video"), "video");
+        return suggestions;
+    }
+
+    private void appendCategorySuggestions(
+            Map<String, List<String>> suggestions,
+            JsonNode typeNode,
+            String suggestionKey) {
+        if (typeNode.isMissingNode() || !typeNode.has("categories")) {
+            return;
+        }
+        List<String> categories = new ArrayList<>();
+        for (JsonNode categoryNode : typeNode.get("categories")) {
+            categories.add(categoryNode.asText());
+        }
+        suggestions.put(suggestionKey, categories);
+    }
+
     /**
-     * Get all categories from crawler service
+     * 获取爬虫服务支持的任务类型与分类信息。
+     *
+     * @return 分类信息，失败时返回空对象
      */
     public CategoriesInfo getCategories() {
         try {
@@ -306,17 +309,17 @@ public class NodeCrawlerService {
     }
 
     /**
-     * Poll async crawl until completed or failed.
+     * 轮询异步文档爬取任务，直到完成或失败。
+     *
+     * @param jobId      异步任务 ID
+     * @param onProgress 进度回调，可为 null
+     * @return 爬取结果页面列表
      */
-    public List<CrawledPage> waitForAsyncDocumentCrawl(String jobId, java.util.function.Consumer<CrawlProgress> onProgress)
-            throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 3 * 60 * 60 * 1000L;
-        int unknownProgressCount = 0;
-        String lastMessage = null;
-        String lastPhase = null;
-        int lastCurrent = -1;
-        int lastTotal = -1;
-        boolean firstPoll = true;
+    public List<CrawledPage> waitForAsyncDocumentCrawl(
+            String jobId,
+            java.util.function.Consumer<CrawlProgress> onProgress) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + ASYNC_CRAWL_TIMEOUT_MS;
+        AsyncPollTracker tracker = new AsyncPollTracker();
 
         while (true) {
             if (System.currentTimeMillis() > deadline) {
@@ -324,79 +327,129 @@ public class NodeCrawlerService {
             }
 
             CrawlProgress progress = getCrawlProgress(jobId);
+            tracker.handleUnknownProgress(progress);
+            tracker.notifyProgressChanged(progress, onProgress);
+
+            List<CrawledPage> completedPages = resolveCompletedAsyncCrawl(jobId, progress);
+            if (completedPages != null) {
+                return completedPages;
+            }
+
+            Thread.sleep(ASYNC_POLL_INTERVAL_MS);
+        }
+    }
+
+    private List<CrawledPage> resolveCompletedAsyncCrawl(String jobId, CrawlProgress progress) {
+        if ("completed".equals(progress.getStatus())) {
+            return getAsyncCrawlResult(jobId);
+        }
+        if ("failed".equals(progress.getStatus())) {
+            throw new RuntimeException(progress.getError() != null
+                    ? progress.getError()
+                    : "Crawl job failed");
+        }
+        return null;
+    }
+
+    private static final class AsyncPollTracker {
+        private int unknownProgressCount;
+        private String lastMessage;
+        private String lastPhase;
+        private int lastCurrent = -1;
+        private int lastTotal = -1;
+        private boolean firstPoll = true;
+
+        private void handleUnknownProgress(CrawlProgress progress) {
             if ("unknown".equals(progress.getStatus())) {
                 unknownProgressCount++;
-                if (unknownProgressCount >= 10) {
+                if (unknownProgressCount >= ASYNC_UNKNOWN_PROGRESS_LIMIT) {
                     throw new RuntimeException("无法获取爬虫进度，请确认 crawler-service 已重启");
                 }
-            } else {
-                unknownProgressCount = 0;
+                return;
             }
+            unknownProgressCount = 0;
+        }
 
-            if (onProgress != null) {
-                boolean changed = firstPoll
-                        || !java.util.Objects.equals(progress.getMessage(), lastMessage)
-                        || !java.util.Objects.equals(progress.getPhase(), lastPhase)
-                        || progress.getCurrent() != lastCurrent
-                        || progress.getTotal() != lastTotal;
-                if (changed) {
-                    onProgress.accept(progress);
-                    lastMessage = progress.getMessage();
-                    lastPhase = progress.getPhase();
-                    lastCurrent = progress.getCurrent();
-                    lastTotal = progress.getTotal();
-                    firstPoll = false;
-                }
+        private void notifyProgressChanged(
+                CrawlProgress progress,
+                java.util.function.Consumer<CrawlProgress> onProgress) {
+            if (onProgress == null) {
+                return;
             }
-
-            if ("completed".equals(progress.getStatus())) {
-                return getAsyncCrawlResult(jobId);
+            boolean changed = firstPoll
+                    || !java.util.Objects.equals(progress.getMessage(), lastMessage)
+                    || !java.util.Objects.equals(progress.getPhase(), lastPhase)
+                    || progress.getCurrent() != lastCurrent
+                    || progress.getTotal() != lastTotal;
+            if (!changed) {
+                return;
             }
-            if ("failed".equals(progress.getStatus())) {
-                throw new RuntimeException(progress.getError() != null
-                        ? progress.getError()
-                        : "Crawl job failed");
-            }
-
-            Thread.sleep(1200);
+            onProgress.accept(progress);
+            lastMessage = progress.getMessage();
+            lastPhase = progress.getPhase();
+            lastCurrent = progress.getCurrent();
+            lastTotal = progress.getTotal();
+            firstPoll = false;
         }
     }
 
     /**
-     * Call Node.js crawler service to crawl pages (Spring docs legacy endpoint).
+     * 调用 Node 爬虫服务抓取视频页面。
+     */
+    public List<CrawledPage> crawlVideoPages(String url, int maxPages, String category) {
+        log.info("Calling Node.js video crawler service: {} for URL: {}, maxPages: {}, category: {}",
+                nodeServiceUrl, url, maxPages, category);
+
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("url", url);
+            requestBody.put("maxPages", maxPages);
+            requestBody.put("category", category != null ? category : "other");
+
+            String response = postJson("/crawl-video", requestBody);
+            return parsePagesResponse(response, "video crawler");
+        } catch (RestClientException e) {
+            log.error("HTTP error calling Node.js video crawler service: {}", e.getMessage(), e);
+            throw new RuntimeException("HTTP error calling Node.js video crawler service: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Failed to call Node.js video crawler service: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to call Node.js video crawler service: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 抓取文档页面（{@link #crawlDocumentPages} 的别名，兼容旧调用方）。
+     *
+     * @param baseUrl  站点根 URL
+     * @param maxPages 最大页面数
+     * @return 爬取结果
      */
     public List<CrawledPage> crawlPages(String baseUrl, int maxPages) {
         return crawlDocumentPages(baseUrl, maxPages);
     }
 
+    /**
+     * 抓取通用文档页面（与 {@link #crawlDocumentPages} 等价）。
+     *
+     * @param url      目标 URL
+     * @param maxPages 最大页面数
+     * @return 爬取结果
+     */
+    public List<CrawledPage> crawlGenericPages(String url, int maxPages) {
+        return crawlDocumentPages(url, maxPages);
+    }
+
+    /**
+     * 调用 Node 爬虫服务刷新全部已缓存文档格式。
+     *
+     * @return 刷新页面数量
+     */
     public int refreshAllPages() {
         log.info("Calling Node.js crawler service to refresh document format: {}", nodeServiceUrl);
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(Map.of(), headers);
-
-            ResponseEntity<String> responseEntity = restTemplate.exchange(
-                    nodeServiceUrl + "/refresh-all",
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            String response = responseEntity.getBody();
-            if (response == null || response.isEmpty()) {
-                throw new RuntimeException("Empty response from crawler refresh service");
-            }
-
-            JsonNode rootNode = objectMapper.readTree(response);
-            if (rootNode.has("pagesRefreshed")) {
-                return rootNode.get("pagesRefreshed").asInt();
-            }
-            if (rootNode.has("pages") && rootNode.get("pages").isArray()) {
-                return rootNode.get("pages").size();
-            }
-            return 0;
+            String response = postJson("/refresh-all", Map.of());
+            return parseRefreshCount(response);
         } catch (RestClientException e) {
             log.error("HTTP error calling Node.js refresh service: {}", e.getMessage(), e);
             throw new RuntimeException("HTTP error calling Node.js refresh service: " + e.getMessage(), e);
@@ -407,78 +460,37 @@ public class NodeCrawlerService {
     }
 
     /**
-     * Call Node.js crawler service to crawl video pages
+     * 向 Node 爬虫服务发送 POST JSON 请求。
+     *
+     * @param path        API 路径（不含 base URL）
+     * @param requestBody 请求体
+     * @return 响应正文
      */
-    public List<CrawledPage> crawlVideoPages(String url, int maxPages, String category) {
-        log.info("Calling Node.js video crawler service: {} for URL: {}, maxPages: {}, category: {}", 
-                nodeServiceUrl, url, maxPages, category);
-
-        try {
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("url", url);
-            requestBody.put("maxPages", maxPages);
-            requestBody.put("category", category != null ? category : "other");
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<String> responseEntity = restTemplate.exchange(
-                    nodeServiceUrl + "/crawl-video",
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            String response = responseEntity.getBody();
-            
-            if (response == null || response.isEmpty()) {
-                log.error("Empty response from video crawler service");
-                throw new RuntimeException("Empty response from video crawler service");
-            }
-
-            JsonNode rootNode = objectMapper.readTree(response);
-            
-            // Check for error response from crawler service
-            if (rootNode.has("success") && !rootNode.get("success").asBoolean()) {
-                String errorMsg = rootNode.has("error") ? rootNode.get("error").asText() : "Unknown error";
-                String errorType = rootNode.has("errorType") ? rootNode.get("errorType").asText() : "CRAWL_ERROR";
-                log.error("Video crawler service returned error: {} (type: {})", errorMsg, errorType);
-                throw new RuntimeException("Video crawl failed: " + errorMsg);
-            }
-            
-            if (!rootNode.has("pages")) {
-                log.error("Invalid response from video crawler service, missing 'pages' field");
-                throw new RuntimeException("Invalid response from video crawler service: missing 'pages' field");
-            }
-
-            JsonNode pagesNode = rootNode.get("pages");
-            
-            if (!pagesNode.isArray()) {
-                log.error("Invalid 'pages' field, expected array");
-                throw new RuntimeException("Invalid 'pages' field format");
-            }
-
-            List<CrawledPage> pages = new ArrayList<>();
-            
-            for (JsonNode pageNode : pagesNode) {
-                CrawledPage page = parsePage(pageNode);
-                pages.add(page);
-            }
-
-            log.info("Successfully parsed {} video pages from Node.js crawler service", pages.size());
-            return pages;
-        } catch (RestClientException e) {
-            log.error("HTTP error calling Node.js video crawler service: {}", e.getMessage(), e);
-            throw new RuntimeException("HTTP error calling Node.js video crawler service: " + e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("Failed to call Node.js video crawler service: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to call Node.js video crawler service: " + e.getMessage(), e);
-        }
+    private String postJson(String path, Map<String, Object> requestBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> responseEntity = restTemplate.exchange(
+                nodeServiceUrl + path,
+                HttpMethod.POST,
+                entity,
+                String.class
+        );
+        return responseEntity.getBody();
     }
 
-    public List<CrawledPage> crawlGenericPages(String url, int maxPages) {
-        return crawlDocumentPages(url, maxPages);
+    private int parseRefreshCount(String response) throws Exception {
+        if (response == null || response.isEmpty()) {
+            throw new RuntimeException("Empty response from crawler refresh service");
+        }
+        JsonNode rootNode = objectMapper.readTree(response);
+        if (rootNode.has("pagesRefreshed")) {
+            return rootNode.get("pagesRefreshed").asInt();
+        }
+        if (rootNode.has("pages") && rootNode.get("pages").isArray()) {
+            return rootNode.get("pages").size();
+        }
+        return 0;
     }
 
     private List<CrawledPage> parsePagesResponse(String response, String serviceName) throws Exception {
@@ -489,7 +501,14 @@ public class NodeCrawlerService {
 
         log.info("Received response from {}, length: {}", serviceName, response.length());
         JsonNode rootNode = objectMapper.readTree(response);
+        JsonNode pagesNode = validatePagesResponseRoot(rootNode, response, serviceName);
+        List<CrawledPage> pages = buildPagesFromJson(pagesNode);
+        attachSiteNavAndQualityReport(pages, pagesNode);
+        log.info("Successfully parsed {} pages from {}", pages.size(), serviceName);
+        return pages;
+    }
 
+    private JsonNode validatePagesResponseRoot(JsonNode rootNode, String response, String serviceName) {
         if (rootNode.has("error") && !rootNode.get("error").isNull()) {
             String errorMsg = rootNode.get("error").asText();
             throw new RuntimeException(errorMsg.isBlank() ? "Crawler service error" : errorMsg);
@@ -498,18 +517,19 @@ public class NodeCrawlerService {
             String errorMsg = rootNode.has("message") ? rootNode.get("message").asText() : "Crawler returned success=false";
             throw new RuntimeException(errorMsg);
         }
-
         if (!rootNode.has("pages")) {
             log.error("Invalid response from {}, missing 'pages' field: {}", serviceName,
                     response.length() > 500 ? response.substring(0, 500) + "..." : response);
             throw new RuntimeException("Invalid response from " + serviceName + ": missing 'pages' field");
         }
-
         JsonNode pagesNode = rootNode.get("pages");
         if (!pagesNode.isArray()) {
             throw new RuntimeException("Invalid 'pages' field format");
         }
+        return pagesNode;
+    }
 
+    private List<CrawledPage> buildPagesFromJson(JsonNode pagesNode) {
         List<CrawledPage> pages = new ArrayList<>();
         List<Map<String, Object>> siteNavTree = null;
 
@@ -527,13 +547,16 @@ public class NodeCrawlerService {
         if (siteNavTree != null && !siteNavTree.isEmpty() && !pages.isEmpty()) {
             pages.get(0).setSiteNavTree(siteNavTree);
         }
+        return pages;
+    }
 
-        if (!pagesNode.isEmpty() && pagesNode.get(0).has("qualityReport")) {
+    private void attachSiteNavAndQualityReport(List<CrawledPage> pages, JsonNode pagesNode) {
+        if (pagesNode.isEmpty() || pages.isEmpty()) {
+            return;
+        }
+        if (pagesNode.get(0).has("qualityReport")) {
             pages.get(0).setQualityReport(pagesNode.get(0).get("qualityReport").toString());
         }
-
-        log.info("Successfully parsed {} pages from {}", pages.size(), serviceName);
-        return pages;
     }
 
     @SuppressWarnings("unchecked")

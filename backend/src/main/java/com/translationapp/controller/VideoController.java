@@ -9,6 +9,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 视频元数据 REST 控制器。
+ */
 @RestController
 @RequestMapping("/api/videos")
 @CrossOrigin(origins = "*")
@@ -20,6 +23,14 @@ public class VideoController {
         this.videoService = videoService;
     }
 
+    /**
+     * 获取视频分页列表。
+     *
+     * @param category 分类编码，可为空
+     * @param page     页码，从 1 开始
+     * @param size     每页条数
+     * @return 分页结果
+     */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getVideoList(
             @RequestParam(required = false) String category,
@@ -45,6 +56,13 @@ public class VideoController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 获取单个视频详情。
+     *
+     * @param id       视频 ID
+     * @param category 分类编码，可为空
+     * @return 视频详情
+     */
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getVideoDetail(
             @PathVariable String id,
@@ -67,6 +85,13 @@ public class VideoController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 删除视频元数据文件。
+     *
+     * @param id       视频 ID
+     * @param category 分类编码，可为空
+     * @return 操作结果
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteVideo(
             @PathVariable String id,
@@ -87,6 +112,11 @@ public class VideoController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 获取所有视频分类目录。
+     *
+     * @return 分类名称列表
+     */
     @GetMapping("/categories")
     public ResponseEntity<Map<String, Object>> getCategories() throws IOException {
         List<String> categories = videoService.getCategories();

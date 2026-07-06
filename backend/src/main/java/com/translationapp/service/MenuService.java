@@ -3,16 +3,21 @@ package com.translationapp.service;
 import com.translationapp.dto.*;
 import com.translationapp.entity.Menu;
 import com.translationapp.entity.Role;
+import com.translationapp.entity.User;
 import com.translationapp.repository.MenuRepository;
 import com.translationapp.repository.RoleRepository;
+import com.translationapp.repository.UserRepository;
 import com.translationapp.util.SiteKeyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,8 +33,12 @@ public class MenuService {
             "oracle", "Oracle"
     );
 
+    private static final String ADMIN_ROLE_NAME = "ADMIN";
+
     private final MenuRepository menuRepository;
     private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final RoleMenuResolver roleMenuResolver;
 
     public List<MenuDTO> findAll() {
         return menuRepository.findAll().stream()
@@ -55,6 +64,40 @@ public class MenuService {
         return rootMenus.stream()
                 .map(m -> toDTOWithChildren(m, childrenMap))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 返回当前用户角色可访问的菜单树，按 sortOrder 排序。
+     * 管理员返回全部可见菜单；其他角色合并 role_menus、权限推导菜单，并展开祖先/子孙节点。
+     */
+    @Transactional(readOnly = true)
+    public List<MenuDTO> findMenusForUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+        if (user.getRoles().stream().anyMatch(role -> ADMIN_ROLE_NAME.equals(role.getName()))) {
+            return findVisibleTree();
+        }
+
+        List<Menu> allMenus = menuRepository.findAll();
+        Map<Long, Menu> byId = allMenus.stream()
+                .collect(Collectors.toMap(Menu::getId, m -> m));
+        Map<Long, List<Menu>> childrenByParent = allMenus.stream()
+                .filter(menu -> menu.getParentId() != null)
+                .collect(Collectors.groupingBy(Menu::getParentId));
+
+        Set<Long> allowedIds = collectAllowedMenuIds(user);
+        if (allowedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> expandedIds = expandMenuClosure(allowedIds, byId, childrenByParent);
+        List<Menu> accessible = allMenus.stream()
+                .filter(menu -> expandedIds.contains(menu.getId()))
+                .filter(this::isAccessibleMenu)
+                .collect(Collectors.toList());
+
+        return buildTreeFromMenuList(accessible);
     }
 
     public List<MenuDTO> findVisibleTree() {
@@ -95,7 +138,9 @@ public class MenuService {
         menu.setIsVisible(request.getIsVisible() != null ? request.getIsVisible() : true);
         menu.setIsEnabled(request.getIsEnabled() != null ? request.getIsEnabled() : true);
 
-        return toDTO(menuRepository.save(menu));
+        Menu saved = menuRepository.save(menu);
+        assignMenuToDefaultRoles(saved);
+        return toDTO(saved);
     }
 
     @Transactional
@@ -158,6 +203,7 @@ public class MenuService {
     public MenuDTO ensureDocumentCategoryMenu(String menuPath, String name, String icon) {
         Optional<Menu> existing = menuRepository.findByPath(menuPath);
         if (existing.isPresent()) {
+            assignMenuToDefaultRoles(existing.get());
             return toDTO(existing.get());
         }
 
@@ -244,15 +290,133 @@ public class MenuService {
         return sb.toString();
     }
 
-    private void assignMenuToDefaultRoles(Menu menu) {
-        roleRepository.findByName("ADMIN").ifPresent(role -> {
-            role.getMenus().add(menu);
-            roleRepository.save(role);
+    /**
+     * 新建菜单时同步到默认系统角色，避免 role_menus 与 menus 表脱节。
+     */
+    void assignMenuToDefaultRoles(Menu menu) {
+        roleRepository.findByName(ADMIN_ROLE_NAME).ifPresent(role -> {
+            if (role.getMenus().add(menu)) {
+                roleRepository.save(role);
+            }
         });
         roleRepository.findByName("USER").ifPresent(role -> {
-            role.getMenus().add(menu);
-            roleRepository.save(role);
+            if (shouldAssignMenuToUserRole(menu) && role.getMenus().add(menu)) {
+                roleRepository.save(role);
+            }
         });
+    }
+
+    /**
+     * 启动或修复时，将 ADMIN 角色菜单与当前全部菜单对齐。
+     */
+    @Transactional
+    public void syncAdminRoleMenus() {
+        roleRepository.findByName(ADMIN_ROLE_NAME).ifPresent(role -> {
+            Set<Menu> allMenus = new HashSet<>(menuRepository.findAll());
+            if (!role.getMenus().equals(allMenus)) {
+                role.setMenus(allMenus);
+                roleRepository.save(role);
+            }
+        });
+    }
+
+    private Set<Long> collectAllowedMenuIds(User user) {
+        Set<Long> allowedIds = new HashSet<>();
+        for (Role role : user.getRoles()) {
+            for (Menu menu : role.getMenus()) {
+                if (isAccessibleMenu(menu)) {
+                    allowedIds.add(menu.getId());
+                }
+            }
+            for (Menu menu : roleMenuResolver.resolveMenus(role.getPermissions())) {
+                if (isAccessibleMenu(menu)) {
+                    allowedIds.add(menu.getId());
+                }
+            }
+        }
+        return allowedIds;
+    }
+
+    private Set<Long> expandMenuClosure(
+            Set<Long> seedIds,
+            Map<Long, Menu> byId,
+            Map<Long, List<Menu>> childrenByParent) {
+        Set<Long> expandedIds = new HashSet<>();
+        for (Long menuId : seedIds) {
+            Menu menu = byId.get(menuId);
+            if (menu == null) {
+                continue;
+            }
+            expandedIds.add(menuId);
+            addAncestorIds(menu, byId, expandedIds);
+            addDescendantIds(menu, childrenByParent, expandedIds);
+        }
+        return expandedIds;
+    }
+
+    private boolean isAccessibleMenu(Menu menu) {
+        return Boolean.TRUE.equals(menu.getIsVisible()) && Boolean.TRUE.equals(menu.getIsEnabled());
+    }
+
+    private boolean shouldAssignMenuToUserRole(Menu menu) {
+        if (menu.getPath() == null) {
+            return false;
+        }
+        if (menu.getPath().startsWith("/documents/") && !menu.getPath().contains(":")) {
+            return true;
+        }
+        return "/dashboard".equals(menu.getPath())
+                || "/tasks".equals(menu.getPath())
+                || "/documents".equals(menu.getPath());
+    }
+
+    private void addDescendantIds(Menu menu, Map<Long, List<Menu>> childrenByParent, Set<Long> allowedIds) {
+        List<Menu> children = childrenByParent.get(menu.getId());
+        if (children == null || children.isEmpty()) {
+            return;
+        }
+        for (Menu child : children) {
+            if (!isAccessibleMenu(child)) {
+                continue;
+            }
+            if (allowedIds.add(child.getId())) {
+                addDescendantIds(child, childrenByParent, allowedIds);
+            }
+        }
+    }
+
+    private void addAncestorIds(Menu menu, Map<Long, Menu> byId, Set<Long> allowedIds) {
+        Long parentId = menu.getParentId();
+        while (parentId != null) {
+            Menu parent = byId.get(parentId);
+            if (parent == null) {
+                break;
+            }
+            if (!isAccessibleMenu(parent)) {
+                break;
+            }
+            allowedIds.add(parent.getId());
+            parentId = parent.getParentId();
+        }
+    }
+
+    private List<MenuDTO> buildTreeFromMenuList(List<Menu> menus) {
+        Set<Long> idSet = menus.stream().map(Menu::getId).collect(Collectors.toSet());
+        Map<Long, List<Menu>> childrenMap = menus.stream()
+                .filter(m -> m.getParentId() != null && idSet.contains(m.getParentId()))
+                .collect(Collectors.groupingBy(Menu::getParentId));
+
+        return menus.stream()
+                .filter(m -> m.getParentId() == null || !idSet.contains(m.getParentId()))
+                .sorted(menuSortComparator())
+                .map(m -> toDTOWithChildren(m, childrenMap))
+                .collect(Collectors.toList());
+    }
+
+    private Comparator<Menu> menuSortComparator() {
+        return (a, b) -> Integer.compare(
+                a.getSortOrder() != null ? a.getSortOrder() : 0,
+                b.getSortOrder() != null ? b.getSortOrder() : 0);
     }
 
     private MenuDTO toDTO(Menu menu) {

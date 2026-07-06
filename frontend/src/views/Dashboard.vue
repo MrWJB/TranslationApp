@@ -307,8 +307,8 @@ onUnmounted(() => {
 const loadStorageKeys = async () => {
   try {
     storageKeys.value = await getStorageKeys()
-  } catch (err) {
-    console.error('Failed to load storage keys:', err)
+  } catch {
+    // 存储键加载失败时使用空列表
   }
 }
 
@@ -334,8 +334,8 @@ const loadRecentTasks = async () => {
   try {
     const result = await getTasks(0, 5)
     recentTasks.value = result.tasks
-  } catch (err) {
-    console.error('Failed to load tasks:', err)
+  } catch {
+    // 任务列表加载失败时不阻塞页面
   }
 }
 
@@ -376,14 +376,14 @@ const identifyType = async () => {
         if (siteAnalysis.value?.estimatedPages && siteAnalysis.value.estimatedPages > maxPages.value) {
           maxPages.value = Math.min(500, siteAnalysis.value.estimatedPages + 20)
         }
-      } catch (err) {
-        console.error('Site analyze failed:', err)
+      } catch {
+        // 站点分析失败时继续展示识别结果
       } finally {
         analyzingSite.value = false
       }
     }
-  } catch (err) {
-    console.error('Failed to identify type:', err)
+  } catch {
+    // URL 类型识别失败时不阻塞表单
   } finally {
     identifying.value = false
   }
@@ -472,8 +472,8 @@ const handleSearch = async () => {
   if (!searchKeyword.value) return
   try {
     searchResults.value = await searchDocuments(searchKeyword.value)
-  } catch (err) {
-    console.error('Search failed:', err)
+  } catch {
+    // 搜索失败时不额外提示
   }
 }
 

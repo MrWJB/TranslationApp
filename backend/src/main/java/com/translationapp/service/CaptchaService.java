@@ -22,6 +22,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 图形验证码生成与校验服务。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -34,17 +37,28 @@ public class CaptchaService {
     private final SecureRandom random = new SecureRandom();
     private final Map<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
 
+    /**
+     * 生成新的算术验证码。
+     *
+     * @return 验证码 ID 与 Base64 图片
+     */
     public CaptchaResponse generate() {
-        int a = random.nextInt(10) + 1;
-        int b = random.nextInt(10) + 1;
-        String answer = String.valueOf(a + b);
-        String expression = a + " + " + b + " = ?";
+        int leftOperand = random.nextInt(10) + 1;
+        int rightOperand = random.nextInt(10) + 1;
+        String answer = String.valueOf(leftOperand + rightOperand);
+        String expression = leftOperand + " + " + rightOperand + " = ?";
         String captchaId = UUID.randomUUID().toString();
         storeAnswer(captchaId, answer);
         String imageBase64 = renderImage(expression);
         return new CaptchaResponse(captchaId, imageBase64);
     }
 
+    /**
+     * 校验用户提交的验证码。
+     *
+     * @param captchaId   验证码 ID
+     * @param captchaCode 用户输入的验证码
+     */
     public void validate(String captchaId, String captchaCode) {
         if (captchaId == null || captchaId.isBlank()) {
             throw new IllegalArgumentException("验证码无效，请刷新后重试");
@@ -94,35 +108,37 @@ public class CaptchaService {
     private String renderImage(String text) {
         int width = captchaProperties.getWidth();
         int height = captchaProperties.getHeight();
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = image.createGraphics();
         try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(new Color(245, 247, 250));
-            g.fillRect(0, 0, width, height);
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = image.createGraphics();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(new Color(245, 247, 250));
+                g.fillRect(0, 0, width, height);
 
-            for (int i = 0; i < 6; i++) {
-                g.setColor(new Color(random.nextInt(180), random.nextInt(180), random.nextInt(180)));
-                g.setStroke(new BasicStroke(1.2f));
-                int x1 = random.nextInt(width);
-                int y1 = random.nextInt(height);
-                int x2 = random.nextInt(width);
-                int y2 = random.nextInt(height);
-                g.drawLine(x1, y1, x2, y2);
+                for (int i = 0; i < 6; i++) {
+                    g.setColor(new Color(random.nextInt(180), random.nextInt(180), random.nextInt(180)));
+                    g.setStroke(new BasicStroke(1.2f));
+                    int x1 = random.nextInt(width);
+                    int y1 = random.nextInt(height);
+                    int x2 = random.nextInt(width);
+                    int y2 = random.nextInt(height);
+                    g.drawLine(x1, y1, x2, y2);
+                }
+
+                g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+                g.setColor(new Color(30, 80, 140));
+                int textWidth = g.getFontMetrics().stringWidth(text);
+                g.drawString(text, (width - textWidth) / 2, height / 2 + 8);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(image, "png", baos);
+                return Base64.getEncoder().encodeToString(baos.toByteArray());
+            } finally {
+                g.dispose();
             }
-
-            g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-            g.setColor(new Color(30, 80, 140));
-            int textWidth = g.getFontMetrics().stringWidth(text);
-            g.drawString(text, (width - textWidth) / 2, height / 2 + 8);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", baos);
-            return Base64.getEncoder().encodeToString(baos.toByteArray());
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to generate captcha image", ex);
-        } finally {
-            g.dispose();
+            throw new IllegalStateException("Failed to generate captcha image (ensure -Djava.awt.headless=true)", ex);
         }
     }
 

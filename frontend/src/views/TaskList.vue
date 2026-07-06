@@ -256,12 +256,12 @@ const identifyType = async () => {
         if (siteAnalysis.value?.estimatedPages && siteAnalysis.value.estimatedPages > newTaskForm.value.maxPages) {
           newTaskForm.value.maxPages = Math.min(500, siteAnalysis.value.estimatedPages + 20)
         }
-      } catch (err) {
-        console.error('Site analyze failed:', err)
+      } catch {
+        // 站点分析失败时继续展示识别结果
       }
     }
-  } catch (err) {
-    console.error('Failed to identify type:', err)
+  } catch {
+    // URL 类型识别失败时不阻塞表单
   } finally {
     identifying.value = false
   }
@@ -293,8 +293,8 @@ const loadTasks = async () => {
     const result = await getTasks(currentPage.value - 1, pageSize.value)
     tasks.value = result.tasks
     total.value = result.total
-  } catch (err) {
-    console.error('Failed to load tasks:', err)
+  } catch {
+    // 任务列表加载失败时不阻塞页面
   } finally {
     loading.value = false
   }

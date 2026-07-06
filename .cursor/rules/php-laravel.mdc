@@ -1,0 +1,47 @@
+---
+description: PHP 8.x 与 Laravel 框架开发规范
+globs: ["**/*.php"]
+alwaysApply: false
+---
+
+# PHP / Laravel 编码规范
+
+## 基础规范
+- 使用 PHP 8.2+ 语法特性（枚举、只读类、纤程等）
+- 遵循 PSR-12 编码风格，使用 PHP-CS-Fixer 自动格式化
+- 所有类必须声明 `strict_types=1`（文件首行 `declare(strict_types=1);`）
+- 禁止使用 `var_dump()`、`dd()`、`dump()` 提交到生产代码
+
+## Laravel 架构
+- Controller 保持精简（不超过 20 行），业务逻辑放入 Service 层或 Action 类
+- 使用 Form Request 进行请求校验，禁止在 Controller 中写 `$request->validate()`
+- 使用 Resource（API Resource）格式化响应数据，禁止直接返回 Model
+- 数据库操作使用 Eloquent ORM，复杂查询使用 Query Builder，禁止裸 SQL 拼接
+
+## 命名规范
+- 模型：单数 PascalCase（如 `User`、`BlogPost`）
+- Controller：复数 + Controller（如 `UsersController`）
+- 数据库表：复数 snake_case（如 `blog_posts`）
+- 外键：单数 + `_id`（如 `user_id`）
+- 路由：kebab-case（如 `/blog-posts`）
+- 配置键：snake_case（如 `app.timezone`）
+
+## 安全
+- 所有用户输入通过 Blade 的 `{{ }}` 自动转义，禁止使用 `{!! !!}` 输出用户数据
+- 数据库查询使用参数绑定，禁止字符串拼接 SQL
+- 敏感配置（数据库密码、API Key）放在 `.env` 文件，禁止提交到 Git
+- 文件上传必须校验 MIME 类型和大小，存储路径不可被用户控制
+- 使用 Laravel 内置的 CSRF 保护，禁止禁用
+
+## 性能
+- 列表查询使用 `paginate()` 分页，禁止一次加载全部数据
+- 关联查询使用 `with()` 预加载，避免 N+1 问题
+- 频繁查询的数据使用 Redis 缓存，设置合理的过期时间
+- 队列处理耗时任务（邮件、图片处理），禁止在请求中同步执行
+- 使用 `DB::transaction()` 包裹多步数据库操作
+
+## 测试
+- 使用 Pest 或 PHPUnit 编写测试，Feature 测试覆盖 API 端点
+- 测试数据库使用 SQLite 内存数据库或 Laravel Sail 中的测试容器
+- 使用 Factory 和 Seeder 生成测试数据，禁止在测试中硬编码
+- 测试命名格式：`it_can_create_a_user` 或 `test_user_can_be_created`

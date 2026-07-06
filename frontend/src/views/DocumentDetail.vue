@@ -141,8 +141,8 @@ const loadDocument = async (id: number) => {
     currentDoc.value = await getDocumentById(id)
     setTimeout(sendThemeToIframes, 300)
     scrollActiveTocIntoView()
-  } catch (err) {
-    console.error('Failed to load document:', err)
+  } catch {
+    // 文档加载失败时不阻塞页面
   }
 }
 
@@ -154,8 +154,8 @@ const resolveDocumentForPath = async (targetPath: string): Promise<Document | nu
   if (tocNode.id) {
     try {
       return await getDocumentById(tocNode.id)
-    } catch (err) {
-      console.error('Failed to load document:', err)
+    } catch {
+      // 目录节点对应文档不存在时跳过
     }
   }
   if (tocNode.localPath) {
@@ -214,8 +214,8 @@ onMounted(async () => {
     }
 
     setTimeout(sendThemeToIframes, 500)
-  } catch (err) {
-    console.error('Failed to load task:', err)
+  } catch {
+    // 任务加载失败时不阻塞页面
   }
 })
 

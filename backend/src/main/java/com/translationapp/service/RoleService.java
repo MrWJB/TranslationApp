@@ -4,7 +4,6 @@ import com.translationapp.dto.*;
 import com.translationapp.entity.Menu;
 import com.translationapp.entity.Permission;
 import com.translationapp.entity.Role;
-import com.translationapp.repository.MenuRepository;
 import com.translationapp.repository.PermissionRepository;
 import com.translationapp.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,7 @@ import java.util.stream.Collectors;
 public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
-    private final MenuRepository menuRepository;
+    private final RoleMenuResolver roleMenuResolver;
 
     public List<RoleDTO> findAll() {
         return roleRepository.findAll().stream()
@@ -45,15 +44,13 @@ public class RoleService {
         role.setDescription(request.getDescription());
         role.setIsSystem(false);
 
+        Set<Permission> permissions = Set.of();
         if (request.getPermissionIds() != null && !request.getPermissionIds().isEmpty()) {
-            Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
+            permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
             role.setPermissions(permissions);
         }
 
-        if (request.getMenuIds() != null && !request.getMenuIds().isEmpty()) {
-            Set<Menu> menus = new HashSet<>(menuRepository.findAllById(request.getMenuIds()));
-            role.setMenus(menus);
-        }
+        role.setMenus(roleMenuResolver.resolveMenus(permissions));
 
         return toDTO(roleRepository.save(role));
     }
@@ -76,15 +73,13 @@ public class RoleService {
 
         role.setDescription(request.getDescription());
 
+        Set<Permission> permissions = role.getPermissions();
         if (request.getPermissionIds() != null) {
-            Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
+            permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
             role.setPermissions(permissions);
         }
 
-        if (request.getMenuIds() != null) {
-            Set<Menu> menus = new HashSet<>(menuRepository.findAllById(request.getMenuIds()));
-            role.setMenus(menus);
-        }
+        role.setMenus(roleMenuResolver.resolveMenus(permissions));
 
         return toDTO(roleRepository.save(role));
     }

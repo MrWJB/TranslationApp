@@ -1,0 +1,14 @@
+---
+description: Shell / Bash 脚本开发规范
+globs: ["**/*.sh", "**/*.bash"]
+alwaysApply: false
+---
+
+# Shell / Bash 编码规范
+
+## 脚本头部
+- 首行必须声明解释器：`#!/usr/bin/env bash`
+- 紧跟严格模式三行：
+  ```bash
+  set -euo pipefail
+  IFS= $ '\n\t'

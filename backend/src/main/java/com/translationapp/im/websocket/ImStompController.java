@@ -7,6 +7,7 @@ import com.translationapp.im.service.MessageService;
 import com.translationapp.im.service.PresenceService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Controller;
 import java.security.Principal;
 import java.util.Map;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class ImStompController {
@@ -80,7 +82,8 @@ public class ImStompController {
         if (principal != null) {
             try {
                 return Long.parseLong(principal.getName());
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.debug("Unable to parse principal name as user id: {}", principal.getName());
             }
         }
         return null;

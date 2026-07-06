@@ -8,15 +8,22 @@ import com.translationapp.im.repository.FriendshipRepository;
 import com.translationapp.im.domain.FriendshipStatus;
 import com.translationapp.im.websocket.ImEventPublisher;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.Set;
 
+/**
+ * IM 用户在线状态服务，基于 Redis 维护 presence 信息。
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PresenceService {
@@ -57,8 +64,40 @@ public class PresenceService {
         try {
             return PresenceStatus.valueOf(status.toString());
         } catch (Exception e) {
+            log.warn("Invalid presence status for user {}: {}", userId, status);
             return PresenceStatus.OFFLINE;
         }
+    }
+
+    public Set<Long> getOnlineUserIds() {
+        Set<Long> online = new HashSet<>();
+        try {
+            ScanOptions options = ScanOptions.scanOptions()
+                    .match(PRESENCE_KEY_PREFIX + "*")
+                    .count(200)
+                    .build();
+            try (Cursor<String> cursor = stringRedisTemplate.scan(options)) {
+                while (cursor.hasNext()) {
+                    String key = cursor.next();
+                    Object status = stringRedisTemplate.opsForHash().get(key, "status");
+                    if (PresenceStatus.ONLINE.name().equals(String.valueOf(status))) {
+                        String idPart = key.substring(PRESENCE_KEY_PREFIX.length());
+                        try {
+                            online.add(Long.parseLong(idPart));
+                        } catch (NumberFormatException e) {
+                            log.warn("Invalid presence key suffix: {}", idPart);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read online users from Redis: {}", e.getMessage());
+        }
+        return online;
+    }
+
+    public int countOnlineUsers() {
+        return getOnlineUserIds().size();
     }
 
     private void broadcastPresence(Long userId, PresenceStatus status) {

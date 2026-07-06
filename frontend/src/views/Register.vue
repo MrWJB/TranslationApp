@@ -157,7 +157,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, Iphone } from '@element-plus/icons-vue'
+import { User, Lock, Iphone, Sunny, Moon } from '@element-plus/icons-vue'
 import {
   register as registerAccount,
   registerByPhone,
@@ -234,8 +234,9 @@ const phoneRules: FormRules = {
   code: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
 }
 
-const finishLogin = (data: { token: string; userId: number; username: string; role: string }) => {
+const finishLogin = async (data: { token: string; userId: number; username: string; role: string }) => {
   userStore.setLoginData(data.token, data.userId, data.username, data.role)
+  await userStore.fetchProfile()
   router.push('/')
 }
 

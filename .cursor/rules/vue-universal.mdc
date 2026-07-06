@@ -1,0 +1,42 @@
+---
+description: Vue 3 项目跨文件通用工程规范
+globs:
+alwaysApply: true
+---
+
+# Vue 3 项目通用规范
+
+## 项目目录结构
+- `src/components/` — 公共组件（PascalCase 命名）
+- `src/composables/` — 组合式函数（useXxx 命名）
+- `src/views/` — 页面级组件
+- `src/stores/` 或 `src/store/` — Pinia Store
+- `src/router/` — 路由配置
+- `src/api/` — 接口请求封装
+- `src/types/` — TypeScript 类型定义
+- `src/utils/` — 工具函数
+- `src/assets/` — 静态资源
+
+## TypeScript 规范
+- 严禁使用 `any`，必须定义明确的 Interface 或 Type
+- 复杂内联类型必须提取为独立 Interface
+- 函数必须显式声明返回值类型
+- 类型定义文件（`.d.ts`）与实现文件分离
+
+## 注释规范
+- 注释解释"为什么"而非"做了什么"
+- 公共函数/Composable 必须有 JSDoc 注释
+- 非直观的业务逻辑必须添加行内注释说明原因
+- 同构代码中标注环境依赖（`// @env browser` / `// @env node`）
+
+## API 请求规范
+- 所有接口请求统一封装在 `src/api/` 目录，按模块拆分文件
+- 使用 Axios 实例统一配置 `baseURL`、超时时间、请求/响应拦截器
+- 响应拦截器统一处理错误码（如 401 跳转登录、500 提示错误）
+- 接口函数必须有 TypeScript 类型标注（参数类型 + 返回类型）
+
+## 测试规范
+- 使用 Vitest 进行单元测试（与 Vite 配置一致，零配置）
+- 测试文件与源文件同目录，命名为 `xxx.test.ts`
+- 组件测试使用 `@testing-library/vue`，以用户视角编写测试
+- Store 测试使用 `createTestingPinia({ stubActions: false })`

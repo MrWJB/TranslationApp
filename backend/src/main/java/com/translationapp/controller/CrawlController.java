@@ -228,6 +228,15 @@ public class CrawlController {
         ));
     }
 
+
+    @PostMapping("/tasks/{id}/retranslate")
+    public ResponseEntity<Map<String, Object>> retranslateTask(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "true") boolean onlyFailed) {
+        Map<String, Object> result = crawlService.retranslateTaskDocuments(id, onlyFailed);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/tasks/{id}/rebuild-toc")
     public ResponseEntity<Map<String, Object>> rebuildTaskToc(@PathVariable Long id) {
         CrawlTask task = crawlService.rebuildTaskTableOfContents(id);

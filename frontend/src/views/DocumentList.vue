@@ -142,8 +142,8 @@ const loadTasks = async () => {
   try {
     const result = await getTasks(0, 1000)
     tasks.value = result.tasks
-  } catch (err) {
-    console.error('Failed to load tasks:', err)
+  } catch {
+    // 任务列表加载失败时不阻塞页面
   } finally {
     loading.value = false
   }

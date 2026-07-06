@@ -2,6 +2,7 @@ package com.translationapp.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -35,6 +36,24 @@ public class User {
 
     @Column(name = "avatar")
     private String avatar;
+
+    @Column(name = "gender")
+    private String gender = "UNKNOWN";
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Column(name = "province")
+    private String province;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "id_card_number")
+    private String idCardNumber;
+
+    @Column(name = "real_name_verified")
+    private Boolean realNameVerified = false;
 
     @Column(name = "is_enabled")
     private Boolean isEnabled = true;

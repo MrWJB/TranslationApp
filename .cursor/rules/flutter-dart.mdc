@@ -1,0 +1,43 @@
+---
+description: Flutter 与 Dart 跨平台开发规范
+globs: ["**/*.dart"]
+alwaysApply: false
+---
+
+# Flutter / Dart 编码规范
+
+## 语言规范
+- 使用 Dart 3.x 语法，充分利用模式匹配（Pattern Matching）和密封类（Sealed Class）
+- 优先使用 `final` 声明不可变变量，仅在确实需要修改时使用 `var`
+- 使用 `const` 构造函数创建编译时常量 Widget，减少重建开销
+- 空安全：避免使用 `!` 强制解包，使用 `??` 提供默认值或 `?.` 安全调用
+
+## Widget 规范
+- Widget 类使用 PascalCase，文件名使用 snake_case（如 `user_profile_card.dart`）
+- `build()` 方法保持精简，复杂 UI 拆分为独立 Widget 或提取为方法
+- 无状态组件使用 `StatelessWidget`，有状态组件使用 `StatefulWidget`
+- 优先使用 `const` 构造函数，所有可 const 的 Widget 必须声明为 const
+- 禁止在 `build()` 中执行异步操作或创建业务逻辑
+
+## 状态管理
+- 简单状态使用 `StatefulWidget` + `setState`
+- 跨组件状态使用 Riverpod（推荐）或 Bloc
+- 服务端数据使用专门的异步状态管理（如 Riverpod 的 `AsyncValue`）
+- 禁止使用全局变量存储状态，必须通过状态管理方案统一管理
+
+## 项目结构
+- `lib/core/` — 核心配置（主题、路由、常量）
+- `lib/features/` — 按功能模块组织（每个模块包含 screen、widget、provider、model）
+- `lib/shared/` — 跨模块共享的 Widget、工具类、扩展
+- `lib/services/` — 网络请求、本地存储等基础服务
+
+## 性能优化
+- 列表使用 `ListView.builder` 或 `SliverList`，禁止使用 `ListView(children: [...])`
+- 图片使用 `cached_network_image` 缓存网络图片
+- 避免不必要的 `setState` 调用，使用 `Selector` 或 `Consumer` 精确监听状态变化
+- 使用 `RepaintBoundary` 隔离频繁重绘的区域
+
+## 安全
+- API Key 通过 `--dart-define` 或 `.env` 注入，禁止硬编码
+- 敏感数据使用 `flutter_secure_storage` 存储
+- HTTPS 通信配置 `App Transport Security`，禁止明文 HTTP

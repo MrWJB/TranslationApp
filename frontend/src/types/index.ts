@@ -43,6 +43,46 @@ export interface LoginResponse {
   role: string
 }
 
+export interface UserProfile {
+  id: number
+  username: string
+  email?: string
+  phone?: string
+  phoneVerified?: boolean
+  realName?: string
+  avatar?: string
+  gender?: string
+  birthDate?: string
+  province?: string
+  city?: string
+  realNameVerified?: boolean
+  idCardMasked?: string
+  lastLoginTime?: string
+  createdAt?: string
+  role?: string
+}
+
+export interface UserProfileUpdateRequest {
+  realName?: string
+  avatar?: string
+  gender?: string
+  birthDate?: string
+  province?: string
+  city?: string
+  email?: string
+  phone?: string
+}
+
+export interface ChangePasswordRequest {
+  oldPassword: string
+  newPassword: string
+}
+
+export interface RealNameVerifyRequest {
+  realName: string
+  idCardNumber: string
+}
+
 export interface CrawlTask {
   id: number
   url: string

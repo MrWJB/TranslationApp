@@ -6,6 +6,7 @@
 </template>
 
 <script setup lang="ts">
+import { Loading } from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -30,7 +31,7 @@ onMounted(() => {
 
   if (token && username && userId && role) {
     userStore.setLoginData(token, Number(userId), username, role)
-    router.replace('/')
+    userStore.fetchProfile().finally(() => router.replace('/'))
     return
   }
 

@@ -1,0 +1,24 @@
+---
+description: 现代 TypeScript 与 React 前端开发规范
+globs: ["**/*.{ts,tsx}"]
+autoAttach: true
+---
+
+# TypeScript / React 编码规范
+
+## 类型系统
+- 严禁使用 `any` 类型，必须定义明确的 Interface 或 Type。
+- 优先使用 Interface 定义对象结构，使用 Type 定义联合类型或工具类型。
+- 函数必须声明参数类型与返回值类型。
+
+## 组件与 Hooks
+- 仅使用函数式组件与 Hooks，禁止使用 Class 组件。
+- 自定义 Hook 必须以 `use` 开头，且必须保证 Hooks 不在条件或循环中调用。
+- Props 必须定义独立的 Interface，禁止使用内联类型定义。
+- 状态管理遵循就近原则：局部状态用 `useState`，跨组件状态用 Context/Zustand，服务端状态用 React Query/TanStack Query。
+
+## 代码质量
+- 遵循 ESLint + Prettier 统一格式，单行代码不超过 120 字符。
+- 避免深层嵌套（最多 3 层），使用提前返回（Early Return）或提取子组件重构。
+- 异步操作必须处理错误边界（Error Boundary）或 try-catch，防止页面白屏。
+- 禁止在渲染函数中执行副作用，副作用必须放入 `useEffect` 并正确声明依赖项。

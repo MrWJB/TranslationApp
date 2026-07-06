@@ -195,112 +195,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture, Star } from '@element-plus/icons-vue'
-import axios from 'axios'
+import { useVideoManagement } from '@/composables/useVideoManagement'
 
-const loading = ref(false)
-const tableData = ref<any[]>([])
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const activeNames = ref<string[]>([])
-
-const showDetail = ref(false)
-const detailData = ref<any>(null)
-
-const episodePage = ref(1)
-const episodePageSize = ref(20)
-
-const pagedEpisodes = computed(() => {
-  if (!detailData.value?.episodes) return []
-  const start = (episodePage.value - 1) * episodePageSize.value
-  const end = start + episodePageSize.value
-  return detailData.value.episodes.slice(start, end)
-})
-
-const updatePagedEpisodes = () => {
-}
-
-const fetchData = async () => {
-  loading.value = true
-  try {
-    const res: any = await axios.get('/api/videos', {
-      params: {
-        category: 'short-drama',
-        page: currentPage.value,
-        size: pageSize.value
-      }
-    })
-    const data = res.data || res
-    if (data.code === 200) {
-      tableData.value = data.data || []
-      total.value = data.total || 0
-    } else {
-      tableData.value = data.content || data.data || []
-      total.value = data.totalElements || data.total || 0
-    }
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取数据失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleView = async (row: any) => {
-  episodePage.value = 1
-  try {
-    const res: any = await axios.get(`/api/videos/${row.id}`, {
-      params: { category: row.category }
-    })
-    const data = res.data || res
-    if (data.code === 200) {
-      detailData.value = data.data
-    } else {
-      detailData.value = data
-    }
-    showDetail.value = true
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取详情失败')
-  }
-}
-
-const handleDelete = async (row: any) => {
-  try {
-    await ElMessageBox.confirm('确定要删除该短剧吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    const res: any = await axios.delete(`/api/videos/${row.id}`, {
-      params: { category: row.category }
-    })
-    const data = res.data || res
-    if (data.code === 200 || res.status === 200) {
-      ElMessage.success('删除成功')
-      fetchData()
-    } else {
-      ElMessage.error(data.message || '删除失败')
-    }
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.message || '删除失败')
-    }
-  }
-}
-
-const handleAdd = () => {
-  ElMessage.info('请通过爬取任务添加短剧')
-}
-
-const handlePlayEpisode = (row: any) => {
-  window.open(row.url, '_blank')
-}
-
-onMounted(() => {
-  fetchData()
-})
+const {
+  loading,
+  tableData,
+  currentPage,
+  pageSize,
+  total,
+  activeNames,
+  showDetail,
+  detailData,
+  episodePage,
+  episodePageSize,
+  pagedEpisodes,
+  updatePagedEpisodes,
+  fetchData,
+  handleView,
+  handleDelete,
+  handleAdd,
+  handlePlayEpisode,
+} = useVideoManagement('short-drama', { mediaLabel: '短剧' })
 </script>
 
 <style scoped>

@@ -155,7 +155,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, Sunny, Moon, Document, ChatLineRound, Connection, DataAnalysis } from '@element-plus/icons-vue'
 import { login, getCaptcha } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
@@ -247,6 +247,7 @@ const handleLogin = async () => {
       })
       persistRememberMePreference()
       userStore.setLoginData(data.token, data.userId, data.username, data.role, rememberMe.value)
+      await userStore.fetchProfile()
       router.push('/')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '登录失败，请检查用户名和密码'

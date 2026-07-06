@@ -1,0 +1,28 @@
+---
+description: 企业级 Java Spring Boot 开发规范
+globs: ["**/*.java"]
+autoAttach: true
+---
+
+# Java 编码规范
+
+## 架构与分层
+- 严格遵循 DDD（领域驱动设计）或经典三层架构（Controller -> Service -> Repository）。
+- Controller 层仅负责参数校验与路由分发，禁止包含核心业务逻辑。
+- 跨层调用必须通过接口（Interface）进行，禁止直接注入实现类。
+
+## 命名与注释
+- 类名使用大驼峰（PascalCase），方法/变量使用小驼峰（camelCase），常量全大写下划线分隔。
+- 所有公共方法必须包含 Javadoc，明确说明功能、`@param`、`@return` 及 `@throws`。
+- 复杂业务逻辑旁必须添加行内注释，解释“为什么这么做”而非“做了什么”。
+
+## 异常与并发
+- 禁止捕获异常后不做任何处理（空 catch 块），至少需记录日志或抛出业务异常。
+- 统一使用全局异常处理器（`@ControllerAdvice`）封装错误响应。
+- 线程池必须通过 `ThreadPoolTaskExecutor` 显式定义，禁止使用 `Executors` 默认工厂方法。
+- 涉及并发修改的集合操作，必须使用并发安全类或加锁机制。
+
+## 安全与性能
+- 数据库查询严禁字符串拼接，必须使用参数化查询或 ORM 框架防 SQL 注入。
+- 敏感配置（如数据库密码、API Key）必须从环境变量或配置中心读取，禁止硬编码。
+- 循环内禁止发起 RPC 或数据库查询，必须改为批量操作。
